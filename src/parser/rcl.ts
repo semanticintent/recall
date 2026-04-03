@@ -1,0 +1,326 @@
+// ─────────────────────────────────────────────────────────
+// RECALL Parser — .rcl source → ReclProgram AST
+// ─────────────────────────────────────────────────────────
+
+export type Division = 'IDENTIFICATION' | 'ENVIRONMENT' | 'DATA' | 'PROCEDURE'
+
+export interface ReclProgram {
+  identification: IdentificationDivision
+  environment: EnvironmentDivision
+  data: DataDivision
+  procedure: ProcedureDivision
+}
+
+export interface IdentificationDivision {
+  programId: string
+  author?: string
+  dateWritten?: string
+  pageTitle: string
+  description?: string
+  favicon?: string
+  language?: string
+}
+
+export interface EnvironmentDivision {
+  viewport: 'RESPONSIVE' | 'FIXED-WIDTH' | 'FULL-WIDTH'
+  colorMode: 'DARK' | 'LIGHT' | 'SYSTEM'
+  fontPrimary?: string
+  fontSecondary?: string
+  language: string
+  palette: Record<string, string>
+}
+
+export type DataLevel = 1 | 5 | 10
+
+export interface DataField {
+  level: DataLevel
+  name: string
+  pic: string
+  value: string
+  children: DataField[]
+}
+
+export interface DataDivision {
+  workingStorage: DataField[]
+  items: DataField[]
+}
+
+export type DisplayElement =
+  | 'HEADING-1' | 'HEADING-2' | 'HEADING-3'
+  | 'PARAGRAPH' | 'LABEL' | 'CODE-BLOCK'
+  | 'BUTTON' | 'LINK' | 'IMAGE' | 'DIVIDER'
+  | 'SECTION' | 'NAVIGATION' | 'FOOTER'
+  | 'CARD-LIST' | 'INPUT' | 'BANNER'
+
+export interface DisplayClause {
+  key: string
+  value: string
+}
+
+export interface DisplayStatement {
+  element: DisplayElement
+  value?: string        // variable name or literal
+  clauses: DisplayClause[]
+  children: DisplayStatement[]
+}
+
+export interface ProcedureSection {
+  name: string
+  statements: DisplayStatement[]
+}
+
+export interface ProcedureDivision {
+  sections: ProcedureSection[]
+}
+
+// ─────────────────────────────────────────────────────────
+// Tokenisation helpers
+// ─────────────────────────────────────────────────────────
+
+function stripComment(line: string): string {
+  // Column 7 indicator: if 7th char is *, it's a comment line
+  if (line.length >= 7 && line[6] === '*') return ''
+  // Inline * comments after a period
+  return line
+}
+
+function cleanLine(raw: string): string {
+  const stripped = stripComment(raw)
+  return stripped.trim()
+}
+
+function extractString(token: string): string {
+  // Remove surrounding quotes
+  if ((token.startsWith('"') && token.endsWith('"')) ||
+      (token.startsWith("'") && token.endsWith("'"))) {
+    return token.slice(1, -1)
+  }
+  return token
+}
+
+function parsePicValue(tokens: string[]): { pic: string; value: string } {
+  // e.g. PIC X(60) VALUE "hello"
+  const picIdx = tokens.indexOf('PIC')
+  const valueIdx = tokens.indexOf('VALUE')
+  const pic = picIdx >= 0 && picIdx + 1 < tokens.length ? tokens[picIdx + 1] : 'X'
+  const value = valueIdx >= 0 && valueIdx + 1 < tokens.length
+    ? extractString(tokens.slice(valueIdx + 1).join(' '))
+    : ''
+  return { pic, value }
+}
+
+// ─────────────────────────────────────────────────────────
+// Division detection
+// ─────────────────────────────────────────────────────────
+
+function detectDivision(line: string): Division | null {
+  if (line.includes('IDENTIFICATION DIVISION')) return 'IDENTIFICATION'
+  if (line.includes('ENVIRONMENT DIVISION')) return 'ENVIRONMENT'
+  if (line.includes('DATA DIVISION')) return 'DATA'
+  if (line.includes('PROCEDURE DIVISION')) return 'PROCEDURE'
+  return null
+}
+
+// ─────────────────────────────────────────────────────────
+// Division parsers
+// ─────────────────────────────────────────────────────────
+
+function parseIdentification(lines: string[]): IdentificationDivision {
+  const result: Partial<IdentificationDivision> = {}
+  for (const raw of lines) {
+    const line = cleanLine(raw)
+    if (!line) continue
+    const tokens = line.replace(/\.$/, '').split(/\s+/)
+    const kw = tokens[0]
+    const val = extractString(tokens.slice(1).join(' '))
+    if (kw === 'PROGRAM-ID.')   result.programId   = val || tokens[1]
+    if (kw === 'AUTHOR.')       result.author       = val
+    if (kw === 'DATE-WRITTEN.') result.dateWritten  = val
+    if (kw === 'PAGE-TITLE.')   result.pageTitle    = val
+    if (kw === 'DESCRIPTION.')  result.description  = val
+    if (kw === 'FAVICON.')      result.favicon      = val
+  }
+  return {
+    programId:   result.programId   ?? 'RECALL-PROGRAM',
+    pageTitle:   result.pageTitle   ?? 'RECALL Page',
+    author:      result.author,
+    dateWritten: result.dateWritten,
+    description: result.description,
+    favicon:     result.favicon,
+  }
+}
+
+function parseEnvironment(lines: string[]): EnvironmentDivision {
+  const result: Partial<EnvironmentDivision> = { palette: {} }
+  for (const raw of lines) {
+    const line = cleanLine(raw)
+    if (!line || line.includes('SECTION')) continue
+    const tokens = line.replace(/\.$/, '').split(/\s+/)
+    const kw = tokens[0]
+
+    if (kw === 'VIEWPORT')       result.viewport      = tokens[1] as EnvironmentDivision['viewport']
+    if (kw === 'COLOR-MODE')     result.colorMode     = tokens[1] as EnvironmentDivision['colorMode']
+    if (kw === 'FONT-PRIMARY')   result.fontPrimary   = extractString(tokens.slice(1).join(' '))
+    if (kw === 'FONT-SECONDARY') result.fontSecondary = extractString(tokens.slice(1).join(' '))
+    if (kw === 'LANGUAGE')       result.language      = tokens[1]
+
+    // Palette: 01 COLOR-ACCENT PIC X(7) VALUE "#..."
+    if (kw === '01') {
+      const name = tokens[1]
+      const { value } = parsePicValue(tokens.slice(2))
+      if (name && value) result.palette![name] = value
+    }
+  }
+  return {
+    viewport:      result.viewport      ?? 'RESPONSIVE',
+    colorMode:     result.colorMode     ?? 'DARK',
+    fontPrimary:   result.fontPrimary,
+    fontSecondary: result.fontSecondary,
+    language:      result.language      ?? 'EN',
+    palette:       result.palette       ?? {},
+  }
+}
+
+function parseDataField(tokens: string[]): DataField {
+  const level = parseInt(tokens[0], 10) as DataLevel
+  const name = tokens[1]
+  const rest = tokens.slice(2)
+  const { pic, value } = parsePicValue(rest)
+  return { level, name, pic, value, children: [] }
+}
+
+function parseData(lines: string[]): DataDivision {
+  const workingStorage: DataField[] = []
+  const items: DataField[] = []
+  let section: 'WORKING-STORAGE' | 'ITEMS' | null = null
+  let stack: DataField[] = []
+
+  for (const raw of lines) {
+    const line = cleanLine(raw)
+    if (!line) continue
+    if (line.includes('WORKING-STORAGE SECTION')) { section = 'WORKING-STORAGE'; stack = []; continue }
+    if (line.includes('ITEMS SECTION'))           { section = 'ITEMS';           stack = []; continue }
+    if (!section) continue
+
+    const tokens = line.replace(/\.$/, '').split(/\s+/)
+    const level = parseInt(tokens[0], 10)
+    if (isNaN(level)) continue
+
+    const field = parseDataField(tokens)
+    const target = section === 'WORKING-STORAGE' ? workingStorage : items
+
+    if (level === 1) {
+      target.push(field)
+      stack = [field]
+    } else if (level === 5) {
+      const parent = stack.find(f => f.level === 1)
+      parent?.children.push(field)
+      stack = stack.filter(f => f.level === 1)
+      stack.push(field)
+    } else if (level === 10) {
+      const parent = stack.find(f => f.level === 5)
+      parent?.children.push(field)
+    }
+  }
+
+  return { workingStorage, items }
+}
+
+function parseDisplayStatement(tokens: string[]): DisplayStatement {
+  // DISPLAY ELEMENT [value] [WITH clause value] ...
+  const element = tokens[1] as DisplayElement
+  let value: string | undefined
+  const clauses: DisplayClause[] = []
+
+  let i = 2
+  // Next token might be a value (not WITH, ON-CLICK, USING, HREF, etc.)
+  if (i < tokens.length && !['WITH', 'ON-CLICK', 'USING', 'HREF', 'ID'].includes(tokens[i])) {
+    value = extractString(tokens[i])
+    i++
+  }
+
+  // Special: ID "name" or USING data-group
+  while (i < tokens.length) {
+    const kw = tokens[i]
+    if (kw === 'WITH' && i + 2 < tokens.length) {
+      clauses.push({ key: tokens[i + 1], value: extractString(tokens[i + 2]) })
+      i += 3
+    } else if (kw === 'ID' && i + 1 < tokens.length) {
+      clauses.push({ key: 'ID', value: extractString(tokens[i + 1]) })
+      i += 2
+    } else if (kw === 'USING' && i + 1 < tokens.length) {
+      clauses.push({ key: 'USING', value: tokens[i + 1] })
+      i += 2
+    } else if (kw === 'ON-CLICK' && i + 2 < tokens.length) {
+      clauses.push({ key: 'ON-CLICK', value: tokens[i + 2] })
+      i += 3
+    } else if (kw === 'HREF' && i + 1 < tokens.length) {
+      clauses.push({ key: 'HREF', value: extractString(tokens[i + 1]) })
+      i += 2
+    } else {
+      i++
+    }
+  }
+
+  return { element, value, clauses, children: [] }
+}
+
+function parseProcedure(lines: string[]): ProcedureDivision {
+  const sections: ProcedureSection[] = []
+  let current: ProcedureSection | null = null
+
+  for (const raw of lines) {
+    const line = cleanLine(raw)
+    if (!line || line === 'STOP RUN.') continue
+
+    // Section header: ends with . and has no DISPLAY
+    if (!line.startsWith('DISPLAY') && line.endsWith('.') && !line.startsWith('STOP')) {
+      const name = line.replace(/\.$/, '').trim()
+      if (name && !name.includes(' ')) {
+        current = { name, statements: [] }
+        sections.push(current)
+        continue
+      }
+    }
+
+    if (line === 'STOP SECTION.') continue
+
+    if (line.startsWith('DISPLAY') && current) {
+      const tokens = line.replace(/\.$/, '').split(/\s+/)
+      current.statements.push(parseDisplayStatement(tokens))
+    }
+  }
+
+  return { sections }
+}
+
+// ─────────────────────────────────────────────────────────
+// Main parse entry point
+// ─────────────────────────────────────────────────────────
+
+export function parse(source: string): ReclProgram {
+  const rawLines = source.split('\n')
+
+  // Split into division buckets
+  const buckets: Record<Division, string[]> = {
+    IDENTIFICATION: [],
+    ENVIRONMENT:    [],
+    DATA:           [],
+    PROCEDURE:      [],
+  }
+
+  let currentDivision: Division | null = null
+
+  for (const line of rawLines) {
+    const div = detectDivision(line)
+    if (div) { currentDivision = div; continue }
+    if (currentDivision) buckets[currentDivision].push(line)
+  }
+
+  return {
+    identification: parseIdentification(buckets.IDENTIFICATION),
+    environment:    parseEnvironment(buckets.ENVIRONMENT),
+    data:           parseData(buckets.DATA),
+    procedure:      parseProcedure(buckets.PROCEDURE),
+  }
+}
