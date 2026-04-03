@@ -39,18 +39,9 @@
 *       01 COMPILE-CMD     PIC X(40)  VALUE "recall compile portfolio.rcl".
 *       01 PRINCIPLE-HEAD  PIC X(40)  VALUE "What RECALL believes.".
 *       01 EXAMPLE-HEAD    PIC X(40)  VALUE "What it looks like.".
-*       01 EXAMPLE-CODE    PIC X(200) VALUE "IDENTIFICATION DIVISION.   PROGRAM-ID. MY-SITE.   PAGE-TITLE. Hello World. PROCEDURE DIVISION.   RENDER-HERO.      DISPLAY HEADING-1 Hello World.   STOP SECTION.   STOP RUN.".
-*       01 FOOTER-TEXT     PIC X(80)  VALUE "COMPILED WITH RECALL 0.1. THE SOURCE IS EMBEDDED ABOVE.".
+*       01 EXAMPLE-CODE    PIC X(200) VALUE "IDENTIFICATION DIVISION.   PROGRAM-ID. MY-SITE.   PAGE-TITLE. Hello World.   DATA DIVISION.   WORKING-STORAGE SECTION.   01 HEADING PIC X(20) VALUE Hello World.   PROCEDURE DIVISION.   RENDER-HERO.   DISPLAY HEADING-1 HEADING.   STOP SECTION.   STOP RUN.".
 *
 *    ITEMS SECTION.
-*       01 NAV-ITEMS.
-*          05 NAV-ITEM-1       PIC X(20)  VALUE "SPEC".
-*          05 NAV-ITEM-1-HREF  PIC X(80)  VALUE "https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md".
-*          05 NAV-ITEM-2       PIC X(20)  VALUE "GITHUB".
-*          05 NAV-ITEM-2-HREF  PIC X(80)  VALUE "https://github.com/semanticintent/recall".
-*          05 NAV-ITEM-3       PIC X(20)  VALUE "NPM".
-*          05 NAV-ITEM-3-HREF  PIC X(80)  VALUE "https://npmjs.com/package/@semanticintent/recall".
-*
 *       01 PRINCIPLE-ITEMS.
 *          05 PRINCIPLE-1.
 *             10 PROJ-TITLE  PIC X(60)  VALUE "THE SOURCE IS THE ARTIFACT".
@@ -76,10 +67,7 @@
 * PROCEDURE DIVISION.
 *
 *    RENDER-NAV.
-*       DISPLAY NAVIGATION USING NAV-ITEMS
-*          WITH STICKY YES
-*          WITH LOGO "RECALL".
-*       STOP SECTION.
+*       COPY FROM "components/nav.rcl".
 *
 *    RENDER-HERO.
 *       DISPLAY SECTION ID "hero"
@@ -134,10 +122,7 @@
 *       STOP SECTION.
 *
 *    RENDER-FOOTER.
-*       DISPLAY FOOTER
-*          WITH TEXT FOOTER-TEXT
-*          WITH ALIGN CENTER.
-*       STOP SECTION.
+*       COPY FROM "components/footer.rcl".
 *
 *    STOP RUN.
 *
@@ -296,7 +281,7 @@ footer.align-right  { text-align: right; }
   <div class="container layout-stack">
   <div class="recall-label">SYNTAX</div>
   <h2 class="style-mono">What it looks like.</h2>
-  <pre class="code-block" data-language="cobol">IDENTIFICATION DIVISION. PROGRAM-ID. MY-SITE. PAGE-TITLE. Hello World. PROCEDURE DIVISION. RENDER-HERO. DISPLAY HEADING-1 Hello World. STOP SECTION. STOP RUN.</pre>
+  <pre class="code-block" data-language="cobol">IDENTIFICATION DIVISION. PROGRAM-ID. MY-SITE. PAGE-TITLE. Hello World. DATA DIVISION. WORKING-STORAGE SECTION. 01 HEADING PIC X(20) VALUE Hello World. PROCEDURE DIVISION. RENDER-HERO. DISPLAY HEADING-1 HEADING. STOP SECTION. STOP RUN.</pre>
   </div>
 </section>
 <footer class="align-center">

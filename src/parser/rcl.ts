@@ -51,6 +51,7 @@ export type DisplayElement =
   | 'BUTTON' | 'LINK' | 'IMAGE' | 'DIVIDER'
   | 'SECTION' | 'NAVIGATION' | 'FOOTER'
   | 'CARD-LIST' | 'INPUT' | 'BANNER'
+  | 'COPY'
 
 export interface DisplayClause {
   key: string
@@ -155,7 +156,7 @@ function parseEnvironment(lines: string[]): EnvironmentDivision {
   const result: Partial<EnvironmentDivision> = { palette: {} }
   for (const raw of lines) {
     const line = cleanLine(raw)
-    if (!line || line.includes('SECTION')) continue
+    if (!line || line.endsWith('SECTION.') || line === 'CONFIGURATION SECTION' || line === 'PALETTE SECTION') continue
     const tokens = line.replace(/\.$/, '').split(/\s+/)
     const kw = tokens[0]
 
@@ -199,8 +200,8 @@ function parseData(lines: string[]): DataDivision {
   for (const raw of lines) {
     const line = cleanLine(raw)
     if (!line) continue
-    if (line.includes('WORKING-STORAGE SECTION')) { section = 'WORKING-STORAGE'; stack = []; continue }
-    if (line.includes('ITEMS SECTION'))           { section = 'ITEMS';           stack = []; continue }
+    if (line.startsWith('WORKING-STORAGE SECTION')) { section = 'WORKING-STORAGE'; stack = []; continue }
+    if (line.startsWith('ITEMS SECTION'))           { section = 'ITEMS';           stack = []; continue }
     if (!section) continue
 
     const tokens = line.replace(/\.$/, '').split(/\s+/)
@@ -310,6 +311,7 @@ function joinContinuationLines(lines: string[]): string[] {
     const isNewStatement =
       line.startsWith('DISPLAY') ||
       line.startsWith('STOP') ||
+      line.startsWith('COPY FROM') ||
       (!line.includes(' ') && line.endsWith('.')) // section header
 
     if (isNewStatement) {
@@ -356,6 +358,16 @@ function parseProcedure(lines: string[]): ProcedureDivision {
         current.statements.push(stmt)
         currentSection = stmt
       } else if (currentSection) {
+        currentSection.children.push(stmt)
+      } else {
+        current.statements.push(stmt)
+      }
+    } else if (line.startsWith('COPY FROM') && current) {
+      // COPY FROM "path/to/component.rcl"
+      const tokens = line.replace(/\.$/, '').split(/\s+/)
+      const filePath = extractString(tokens.slice(2).join(' '))
+      const stmt: DisplayStatement = { element: 'COPY', value: filePath, clauses: [], children: [] }
+      if (currentSection) {
         currentSection.children.push(stmt)
       } else {
         current.statements.push(stmt)

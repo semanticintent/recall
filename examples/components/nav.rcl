@@ -1,0 +1,19 @@
+IDENTIFICATION DIVISION.
+   PROGRAM-ID. RECALL-NAV.
+
+DATA DIVISION.
+   ITEMS SECTION.
+      01 NAV-ITEMS.
+         05 NAV-ITEM-1       PIC X(20)  VALUE "SPEC".
+         05 NAV-ITEM-1-HREF  PIC X(80)  VALUE "https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md".
+         05 NAV-ITEM-2       PIC X(20)  VALUE "GITHUB".
+         05 NAV-ITEM-2-HREF  PIC X(80)  VALUE "https://github.com/semanticintent/recall".
+         05 NAV-ITEM-3       PIC X(20)  VALUE "NPM".
+         05 NAV-ITEM-3-HREF  PIC X(80)  VALUE "https://npmjs.com/package/@semanticintent/recall".
+
+PROCEDURE DIVISION.
+   COMPONENT.
+      DISPLAY NAVIGATION USING NAV-ITEMS
+         WITH STICKY YES
+         WITH LOGO "RECALL".
+      STOP SECTION.
