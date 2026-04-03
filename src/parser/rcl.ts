@@ -226,20 +226,49 @@ function parseData(lines: string[]): DataDivision {
   return { workingStorage, items }
 }
 
-function parseDisplayStatement(tokens: string[]): DisplayStatement {
-  // DISPLAY ELEMENT [value] [WITH clause value] ...
+function tokeniseLine(line: string): string[] {
+  // Tokenise respecting quoted strings
+  const tokens: string[] = []
+  let current = ''
+  let inQuote = false
+  let quoteChar = ''
+
+  for (const ch of line) {
+    if (!inQuote && (ch === '"' || ch === "'")) {
+      inQuote = true
+      quoteChar = ch
+      current += ch
+    } else if (inQuote && ch === quoteChar) {
+      inQuote = false
+      current += ch
+      tokens.push(current)
+      current = ''
+    } else if (!inQuote && ch === ' ') {
+      if (current) { tokens.push(current); current = '' }
+    } else {
+      current += ch
+    }
+  }
+  if (current) tokens.push(current)
+  return tokens
+}
+
+function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
+  // Re-tokenise the joined line respecting quoted strings
+  const line = rawTokens.join(' ')
+  const tokens = tokeniseLine(line)
+
   const element = tokens[1] as DisplayElement
   let value: string | undefined
   const clauses: DisplayClause[] = []
 
   let i = 2
-  // Next token might be a value (not WITH, ON-CLICK, USING, HREF, etc.)
+  // Next token might be a value (not a keyword)
   if (i < tokens.length && !['WITH', 'ON-CLICK', 'USING', 'HREF', 'ID'].includes(tokens[i])) {
     value = extractString(tokens[i])
     i++
   }
 
-  // Special: ID "name" or USING data-group
   while (i < tokens.length) {
     const kw = tokens[i]
     if (kw === 'WITH' && i + 2 < tokens.length) {
@@ -252,7 +281,8 @@ function parseDisplayStatement(tokens: string[]): DisplayStatement {
       clauses.push({ key: 'USING', value: tokens[i + 1] })
       i += 2
     } else if (kw === 'ON-CLICK' && i + 2 < tokens.length) {
-      clauses.push({ key: 'ON-CLICK', value: tokens[i + 2] })
+      // ON-CLICK GOTO "#href"
+      clauses.push({ key: 'ON-CLICK', value: extractString(tokens[i + 2]) })
       i += 3
     } else if (kw === 'HREF' && i + 1 < tokens.length) {
       clauses.push({ key: 'HREF', value: extractString(tokens[i + 1]) })
@@ -265,18 +295,46 @@ function parseDisplayStatement(tokens: string[]): DisplayStatement {
   return { element, value, clauses, children: [] }
 }
 
-function parseProcedure(lines: string[]): ProcedureDivision {
-  const sections: ProcedureSection[] = []
-  let current: ProcedureSection | null = null
+function joinContinuationLines(lines: string[]): string[] {
+  // Merge lines that are continuation of a DISPLAY statement
+  // A DISPLAY statement continues as long as the next line doesn't start
+  // a new keyword (section header, STOP, another DISPLAY)
+  const joined: string[] = []
+  let current = ''
 
   for (const raw of lines) {
     const line = cleanLine(raw)
+    if (!line) continue
+
+    const isNewStatement =
+      line.startsWith('DISPLAY') ||
+      line.startsWith('STOP') ||
+      (!line.includes(' ') && line.endsWith('.')) // section header
+
+    if (isNewStatement) {
+      if (current) joined.push(current)
+      current = line
+    } else {
+      // continuation — append to current
+      current = current ? `${current} ${line}` : line
+    }
+  }
+  if (current) joined.push(current)
+  return joined
+}
+
+function parseProcedure(lines: string[]): ProcedureDivision {
+  const sections: ProcedureSection[] = []
+  let current: ProcedureSection | null = null
+  const joined = joinContinuationLines(lines)
+
+  for (const line of joined) {
     if (!line || line === 'STOP RUN.') continue
 
-    // Section header: ends with . and has no DISPLAY
-    if (!line.startsWith('DISPLAY') && line.endsWith('.') && !line.startsWith('STOP')) {
+    // Section header: single word ending with .
+    if (!line.startsWith('DISPLAY') && line.endsWith('.') && !line.startsWith('STOP') && !line.includes(' ')) {
       const name = line.replace(/\.$/, '').trim()
-      if (name && !name.includes(' ')) {
+      if (name) {
         current = { name, statements: [] }
         sections.push(current)
         continue

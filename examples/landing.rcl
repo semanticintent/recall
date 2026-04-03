@@ -1,0 +1,135 @@
+IDENTIFICATION DIVISION.
+   PROGRAM-ID.    RECALL-LANDING.
+   AUTHOR.        SEMANTICINTENT.
+   DATE-WRITTEN.  2026-04-03.
+   PAGE-TITLE.    "RECALL — The Source That Remembers".
+   DESCRIPTION.   "A declarative web interface language with COBOL-inspired syntax. The source is the artifact. Every compiled page embeds its own origin.".
+   FAVICON.       "/favicon.ico".
+
+ENVIRONMENT DIVISION.
+   CONFIGURATION SECTION.
+      VIEWPORT         RESPONSIVE.
+      COLOR-MODE       DARK.
+      FONT-PRIMARY     "IBM Plex Mono".
+      FONT-SECONDARY   "IBM Plex Sans".
+      LANGUAGE         EN.
+
+   PALETTE SECTION.
+      01 COLOR-ACCENT    PIC X(7) VALUE "#00FF41".
+      01 COLOR-BG        PIC X(7) VALUE "#080808".
+      01 COLOR-TEXT      PIC X(7) VALUE "#E0E0E0".
+      01 COLOR-MUTED     PIC X(7) VALUE "#555555".
+      01 COLOR-BORDER    PIC X(7) VALUE "#1A1A1A".
+
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+      01 HERO-HEADING    PIC X(60)  VALUE "STILL HERE.".
+      01 HERO-SUBHEADING PIC X(60)  VALUE "STILL RUNNING.".
+      01 HERO-BODY       PIC X(200) VALUE "RECALL is a declarative web interface language with COBOL-inspired syntax. It transpiles to self-contained, dependency-free HTML files. The source is always embedded in the output.".
+      01 CTA-PRIMARY     PIC X(30)  VALUE "READ THE SPEC".
+      01 CTA-SECONDARY   PIC X(30)  VALUE "VIEW ON GITHUB".
+      01 INSTALL-CMD     PIC X(40)  VALUE "npm install -g @semanticintent/recall".
+      01 COMPILE-CMD     PIC X(40)  VALUE "recall compile portfolio.rcl".
+      01 PRINCIPLE-HEAD  PIC X(40)  VALUE "What RECALL believes.".
+      01 EXAMPLE-HEAD    PIC X(40)  VALUE "What it looks like.".
+      01 EXAMPLE-CODE    PIC X(200) VALUE "IDENTIFICATION DIVISION.   PROGRAM-ID. MY-SITE.   PAGE-TITLE. Hello World. PROCEDURE DIVISION.   RENDER-HERO.      DISPLAY HEADING-1 Hello World.   STOP SECTION.   STOP RUN.".
+      01 FOOTER-TEXT     PIC X(80)  VALUE "COMPILED WITH RECALL 0.1. THE SOURCE IS EMBEDDED ABOVE.".
+
+   ITEMS SECTION.
+      01 NAV-ITEMS.
+         05 NAV-ITEM-1       PIC X(20)  VALUE "SPEC".
+         05 NAV-ITEM-1-HREF  PIC X(80)  VALUE "https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md".
+         05 NAV-ITEM-2       PIC X(20)  VALUE "GITHUB".
+         05 NAV-ITEM-2-HREF  PIC X(80)  VALUE "https://github.com/semanticintent/recall".
+         05 NAV-ITEM-3       PIC X(20)  VALUE "NPM".
+         05 NAV-ITEM-3-HREF  PIC X(80)  VALUE "https://npmjs.com/package/@semanticintent/recall".
+
+      01 PRINCIPLE-ITEMS.
+         05 PRINCIPLE-1.
+            10 PROJ-TITLE  PIC X(60)  VALUE "THE SOURCE IS THE ARTIFACT".
+            10 PROJ-DESC   PIC X(200) VALUE "Every compiled .html file embeds its .rcl source in a comment block at the top. View source on any RECALL page and you will see COBOL divisions.".
+            10 PROJ-TAG    PIC X(20)  VALUE "CORE".
+            10 PROJ-HREF   PIC X(80)  VALUE "#".
+         05 PRINCIPLE-2.
+            10 PROJ-TITLE  PIC X(60)  VALUE "ZERO DEPENDENCIES".
+            10 PROJ-DESC   PIC X(200) VALUE "Output is one HTML file. Inline CSS. Vanilla JS where needed. No CDN links. No frameworks. No build step to run the result.".
+            10 PROJ-TAG    PIC X(20)  VALUE "CONSTRAINT".
+            10 PROJ-HREF   PIC X(80)  VALUE "#".
+         05 PRINCIPLE-3.
+            10 PROJ-TITLE  PIC X(60)  VALUE "VERBOSE IS A FEATURE".
+            10 PROJ-DESC   PIC X(200) VALUE "COBOL's English-like verbosity is intentional legibility. A RECALL source file reads like a structured document. The intent is visible without a comment.".
+            10 PROJ-TAG    PIC X(20)  VALUE "PHILOSOPHY".
+            10 PROJ-HREF   PIC X(80)  VALUE "#".
+         05 PRINCIPLE-4.
+            10 PROJ-TITLE  PIC X(60)  VALUE "LEGACY FORWARD".
+            10 PROJ-DESC   PIC X(200) VALUE "This is not nostalgia. COBOL systems from the 1960s are still running payroll. RECALL asks: what would a web language look like if it was designed to last?".
+            10 PROJ-TAG    PIC X(20)  VALUE "STATEMENT".
+            10 PROJ-HREF   PIC X(80)  VALUE "#".
+
+PROCEDURE DIVISION.
+
+   RENDER-NAV.
+      DISPLAY NAVIGATION USING NAV-ITEMS
+         WITH STICKY YES
+         WITH LOGO "RECALL".
+      STOP SECTION.
+
+   RENDER-HERO.
+      DISPLAY SECTION ID "hero"
+         WITH LAYOUT CENTERED
+         WITH PADDING LARGE.
+         DISPLAY HEADING-1 HERO-HEADING
+            WITH STYLE MONO.
+         DISPLAY HEADING-2 HERO-SUBHEADING
+            WITH STYLE MONO.
+         DISPLAY PARAGRAPH HERO-BODY.
+         DISPLAY BUTTON CTA-PRIMARY
+            ON-CLICK GOTO "https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md"
+            WITH STYLE PRIMARY.
+         DISPLAY BUTTON CTA-SECONDARY
+            ON-CLICK GOTO "https://github.com/semanticintent/recall"
+            WITH STYLE GHOST.
+      STOP SECTION.
+
+   RENDER-INSTALL.
+      DISPLAY SECTION ID "install"
+         WITH LAYOUT STACK
+         WITH PADDING MEDIUM.
+         DISPLAY LABEL "GET STARTED".
+         DISPLAY CODE-BLOCK INSTALL-CMD
+            WITH LANGUAGE "bash".
+         DISPLAY CODE-BLOCK COMPILE-CMD
+            WITH LANGUAGE "bash".
+      STOP SECTION.
+
+   RENDER-PRINCIPLES.
+      DISPLAY SECTION ID "principles"
+         WITH LAYOUT STACK
+         WITH PADDING MEDIUM.
+         DISPLAY LABEL "DESIGN PRINCIPLES".
+         DISPLAY HEADING-2 PRINCIPLE-HEAD
+            WITH STYLE MONO.
+         DISPLAY CARD-LIST USING PRINCIPLE-ITEMS
+            WITH STYLE BORDERED
+            WITH COLUMNS 2
+            WITH HOVER-LIFT YES.
+      STOP SECTION.
+
+   RENDER-EXAMPLE.
+      DISPLAY SECTION ID "example"
+         WITH LAYOUT STACK
+         WITH PADDING MEDIUM.
+         DISPLAY LABEL "SYNTAX".
+         DISPLAY HEADING-2 EXAMPLE-HEAD
+            WITH STYLE MONO.
+         DISPLAY CODE-BLOCK EXAMPLE-CODE
+            WITH LANGUAGE "cobol".
+      STOP SECTION.
+
+   RENDER-FOOTER.
+      DISPLAY FOOTER
+         WITH TEXT FOOTER-TEXT
+         WITH ALIGN CENTER.
+      STOP SECTION.
+
+   STOP RUN.
