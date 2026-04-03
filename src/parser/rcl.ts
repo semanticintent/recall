@@ -114,10 +114,11 @@ function parsePicValue(tokens: string[]): { pic: string; value: string } {
 // ─────────────────────────────────────────────────────────
 
 function detectDivision(line: string): Division | null {
-  if (line.includes('IDENTIFICATION DIVISION')) return 'IDENTIFICATION'
-  if (line.includes('ENVIRONMENT DIVISION')) return 'ENVIRONMENT'
-  if (line.includes('DATA DIVISION')) return 'DATA'
-  if (line.includes('PROCEDURE DIVISION')) return 'PROCEDURE'
+  const t = line.trim()
+  if (t.startsWith('IDENTIFICATION DIVISION')) return 'IDENTIFICATION'
+  if (t.startsWith('ENVIRONMENT DIVISION'))   return 'ENVIRONMENT'
+  if (t.startsWith('DATA DIVISION'))          return 'DATA'
+  if (t.startsWith('PROCEDURE DIVISION'))     return 'PROCEDURE'
   return null
 }
 
@@ -326,6 +327,7 @@ function joinContinuationLines(lines: string[]): string[] {
 function parseProcedure(lines: string[]): ProcedureDivision {
   const sections: ProcedureSection[] = []
   let current: ProcedureSection | null = null
+  let currentSection: DisplayStatement | null = null
   const joined = joinContinuationLines(lines)
 
   for (const line of joined) {
@@ -336,16 +338,28 @@ function parseProcedure(lines: string[]): ProcedureDivision {
       const name = line.replace(/\.$/, '').trim()
       if (name) {
         current = { name, statements: [] }
+        currentSection = null
         sections.push(current)
         continue
       }
     }
 
-    if (line === 'STOP SECTION.') continue
+    if (line === 'STOP SECTION.') {
+      currentSection = null
+      continue
+    }
 
     if (line.startsWith('DISPLAY') && current) {
       const tokens = line.replace(/\.$/, '').split(/\s+/)
-      current.statements.push(parseDisplayStatement(tokens))
+      const stmt = parseDisplayStatement(tokens)
+      if (stmt.element === 'SECTION') {
+        current.statements.push(stmt)
+        currentSection = stmt
+      } else if (currentSection) {
+        currentSection.children.push(stmt)
+      } else {
+        current.statements.push(stmt)
+      }
     }
   }
 

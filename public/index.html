@@ -234,47 +234,74 @@ footer.align-right  { text-align: right; }
   <div class="nav-inner">
     <span class="nav-logo">RECALL</span>
     <div class="nav-links">
-      
+      <a href="https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md">SPEC</a>
+        <a href="https://github.com/semanticintent/recall">GITHUB</a>
+        <a href="https://npmjs.com/package/@semanticintent/recall">NPM</a>
     </div>
   </div>
 </nav>
 <section id="hero" class="padding-large">
   <div class="container layout-centered">
-  
+  <h1 class="style-mono">STILL HERE.</h1>
+  <h2 class="style-mono">STILL RUNNING.</h2>
+  <p>RECALL is a declarative web interface language with COBOL-inspired syntax. It transpiles to self-contained, dependency-free HTML files. The source is always embedded in the output.</p>
+  <a href="https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md" class="recall-btn primary">READ THE SPEC</a>
+  <a href="https://github.com/semanticintent/recall" class="recall-btn ghost">VIEW ON GITHUB</a>
   </div>
 </section>
-<h1 class="style-mono">STILL HERE.</h1>
-<h2 class="style-mono">STILL RUNNING.</h2>
-<p>RECALL is a declarative web interface language with COBOL-inspired syntax. It transpiles to self-contained, dependency-free HTML files. The source is always embedded in the output.</p>
-<a href="https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md" class="recall-btn primary">READ THE SPEC</a>
-<a href="https://github.com/semanticintent/recall" class="recall-btn ghost">VIEW ON GITHUB</a>
 <section id="install" class="padding-medium">
   <div class="container layout-stack">
-  
+  <div class="recall-label">GET STARTED</div>
+  <pre class="code-block" data-language="bash">npm install -g @semanticintent/recall</pre>
+  <pre class="code-block" data-language="bash">recall compile portfolio.rcl</pre>
   </div>
 </section>
-<div class="recall-label">GET STARTED</div>
-<pre class="code-block" data-language="bash">npm install -g @semanticintent/recall</pre>
-<pre class="code-block" data-language="bash">recall compile portfolio.rcl</pre>
 <section id="principles" class="padding-medium">
   <div class="container layout-stack">
-  
+  <div class="recall-label">DESIGN PRINCIPLES</div>
+  <h2 class="style-mono">What RECALL believes.</h2>
+  <div class="layout-grid cols-2 style-bordered">
+    <div class="card hover-lift">
+      <a href="#">
+        <h3>THE SOURCE IS THE ARTIFACT</h3>
+        <p>Every compiled .html file embeds its .rcl source in a comment block at the top. View source on any RECALL page and you will see COBOL divisions.</p>
+        <span class="card-tag">CORE</span>
+      </a>
+    </div>
+    <div class="card hover-lift">
+      <a href="#">
+        <h3>ZERO DEPENDENCIES</h3>
+        <p>Output is one HTML file. Inline CSS. Vanilla JS where needed. No CDN links. No frameworks. No build step to run the result.</p>
+        <span class="card-tag">CONSTRAINT</span>
+      </a>
+    </div>
+    <div class="card hover-lift">
+      <a href="#">
+        <h3>VERBOSE IS A FEATURE</h3>
+        <p>COBOL's English-like verbosity is intentional legibility. A RECALL source file reads like a structured document. The intent is visible without a comment.</p>
+        <span class="card-tag">PHILOSOPHY</span>
+      </a>
+    </div>
+    <div class="card hover-lift">
+      <a href="#">
+        <h3>LEGACY FORWARD</h3>
+        <p>This is not nostalgia. COBOL systems from the 1960s are still running payroll. RECALL asks: what would a web language look like if it was designed to last?</p>
+        <span class="card-tag">STATEMENT</span>
+      </a>
+    </div>
+  </div>
   </div>
 </section>
-<div class="recall-label">DESIGN PRINCIPLES</div>
-<h2 class="style-mono">What RECALL believes.</h2>
-<!-- CARD-LIST: group PRINCIPLE-ITEMS not found -->
 <section id="example" class="padding-medium">
   <div class="container layout-stack">
-  
+  <div class="recall-label">SYNTAX</div>
+  <h2 class="style-mono">What it looks like.</h2>
+  <pre class="code-block" data-language="cobol">IDENTIFICATION DIVISION. PROGRAM-ID. MY-SITE. PAGE-TITLE. Hello World. PROCEDURE DIVISION. RENDER-HERO. DISPLAY HEADING-1 Hello World. STOP SECTION. STOP RUN.</pre>
   </div>
 </section>
-<div class="recall-label">SYNTAX</div>
-<h2 class="style-mono">What it looks like.</h2>
-<pre class="code-block" data-language="cobol">EXAMPLE-CODE</pre>
 <footer class="align-center">
   <div class="container">
-    <p>FOOTER-TEXT</p>
+    <p>COMPILED WITH RECALL 0.1. THE SOURCE IS EMBEDDED ABOVE.</p>
   </div>
 </footer>
 </body>
