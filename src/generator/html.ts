@@ -204,7 +204,7 @@ function renderNavigation(stmt: DisplayStatement, data: DataDivision): string {
 
   return `<nav class="${stickyClass}">
   <div class="nav-inner">
-    ${logo ? `<span class="nav-logo">${escapeHtml(logo)}</span>` : ''}
+    ${logo ? `<a href="/index.html" class="nav-logo">${escapeHtml(logo)}</a>` : ''}
     <div class="nav-links">
       ${links}
     </div>
