@@ -423,7 +423,7 @@ function renderBanner(stmt: DisplayStatement, data: DataDivision): string {
 }
 
 function renderCodeBlock(stmt: DisplayStatement, data: DataDivision): string {
-  const text = escapeHtml(resolveValue(stmt.value, data))
+  const text = escapeHtml(resolveValue(stmt.value, data).replace(/\\n/g, '\n'))
   const lang = clause(stmt.clauses, 'LANGUAGE', '')
   return `<pre class="code-block"${lang ? ` data-language="${lang}"` : ''}>${text}</pre>`
 }
