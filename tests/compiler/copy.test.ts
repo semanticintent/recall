@@ -59,14 +59,14 @@ DATA DIVISION.
 PROCEDURE DIVISION.
 
    RENDER-NAV.
-      COPY FROM "components/nav.rcl".
+      COPY FROM "components/nav.rcpy".
 
    RENDER-MAIN.
       DISPLAY HEADING-1 HEADING.
    STOP SECTION.
 
    RENDER-FOOTER.
-      COPY FROM "components/footer.rcl".
+      COPY FROM "components/footer.rcpy".
 
    STOP RUN.
 `
@@ -79,8 +79,8 @@ function setup() {
 describe('COPY statement', () => {
   it('inlines component procedure into parent', () => {
     setup()
-    writeFileSync(join(TMP, 'components', 'footer.rcl'), COMPONENT)
-    writeFileSync(join(TMP, 'components', 'nav.rcl'), COMPONENT_NAV)
+    writeFileSync(join(TMP, 'components', 'footer.rcpy'), COMPONENT)
+    writeFileSync(join(TMP, 'components', 'nav.rcpy'), COMPONENT_NAV)
     writeFileSync(join(TMP, 'main.rcl'), SOURCE_WITH_COPY)
     const result = compile(join(TMP, 'main.rcl'))
     expect(result.ok).toBe(true)
@@ -91,8 +91,8 @@ describe('COPY statement', () => {
 
   it('merges component data into parent data', () => {
     setup()
-    writeFileSync(join(TMP, 'components', 'footer.rcl'), COMPONENT)
-    writeFileSync(join(TMP, 'components', 'nav.rcl'), COMPONENT_NAV)
+    writeFileSync(join(TMP, 'components', 'footer.rcpy'), COMPONENT)
+    writeFileSync(join(TMP, 'components', 'nav.rcpy'), COMPONENT_NAV)
     writeFileSync(join(TMP, 'main.rcl'), SOURCE_WITH_COPY)
     compile(join(TMP, 'main.rcl'))
     const html = readFileSync(join(TMP, 'main.html'), 'utf-8')
@@ -105,8 +105,8 @@ describe('COPY statement', () => {
 
   it('component data does not pollute component source comment', () => {
     setup()
-    writeFileSync(join(TMP, 'components', 'footer.rcl'), COMPONENT)
-    writeFileSync(join(TMP, 'components', 'nav.rcl'), COMPONENT_NAV)
+    writeFileSync(join(TMP, 'components', 'footer.rcpy'), COMPONENT)
+    writeFileSync(join(TMP, 'components', 'nav.rcpy'), COMPONENT_NAV)
     writeFileSync(join(TMP, 'main.rcl'), SOURCE_WITH_COPY)
     compile(join(TMP, 'main.rcl'))
     const html = readFileSync(join(TMP, 'main.html'), 'utf-8')

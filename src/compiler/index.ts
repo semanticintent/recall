@@ -2,8 +2,8 @@
 // RECALL Compiler — orchestrates parse → generate
 // ─────────────────────────────────────────────────────────
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { resolve, basename, dirname, join } from 'node:path'
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, statSync } from 'node:fs'
+import { resolve, basename, dirname, join, relative, extname } from 'node:path'
 import { parse } from '../parser/rcl.js'
 import { generate } from '../generator/html.js'
 import type { DataDivision, ComponentDivision, DisplayStatement } from '../parser/rcl.js'
@@ -162,6 +162,83 @@ export function compile(inputPath: string, outDir?: string): CompileResult {
   }
 
   return { ok: true, inputPath: absInput, outputPath }
+}
+
+// ─────────────────────────────────────────────────────────
+// BUILD — compile an entire directory of .rcl files
+// ─────────────────────────────────────────────────────────
+
+export interface BuildResult {
+  ok: boolean
+  srcDir: string
+  outDir: string
+  compiled: CompileResult[]
+  errors: CompileResult[]
+}
+
+function findRclFiles(dir: string): string[] {
+  const results: string[] = []
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) {
+      results.push(...findRclFiles(full))
+    } else if (extname(entry) === '.rcl') {
+      results.push(full)
+    }
+  }
+  return results
+}
+
+export function build(srcDir: string, outDir?: string): BuildResult {
+  const absSrc = resolve(srcDir)
+  const absOut = resolve(outDir ?? 'public')
+
+  const compiled: CompileResult[] = []
+  const errors: CompileResult[] = []
+
+  if (!existsSync(absSrc)) {
+    return {
+      ok: false,
+      srcDir: absSrc,
+      outDir: absOut,
+      compiled,
+      errors: [{ ok: false, inputPath: absSrc, error: `SOURCE DIRECTORY NOT FOUND: ${absSrc}` }],
+    }
+  }
+
+  const files = findRclFiles(absSrc)
+
+  if (files.length === 0) {
+    return {
+      ok: false,
+      srcDir: absSrc,
+      outDir: absOut,
+      compiled,
+      errors: [{ ok: false, inputPath: absSrc, error: `NO .rcl FILES FOUND IN: ${absSrc}` }],
+    }
+  }
+
+  for (const file of files) {
+    // Mirror the source directory structure in the output directory
+    const rel = relative(absSrc, dirname(file))
+    const fileOutDir = join(absOut, rel)
+    mkdirSync(fileOutDir, { recursive: true })
+
+    const result = compile(file, fileOutDir)
+    if (result.ok) {
+      compiled.push(result)
+    } else {
+      errors.push(result)
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    srcDir: absSrc,
+    outDir: absOut,
+    compiled,
+    errors,
+  }
 }
 
 export function check(inputPath: string): CheckResult {

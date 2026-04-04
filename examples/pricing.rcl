@@ -4,7 +4,7 @@ IDENTIFICATION DIVISION.
    DESCRIPTION. "Simple pricing for a simple language.".
 
 ENVIRONMENT DIVISION.
-   COPY FROM "theme.rcl".
+   COPY FROM "theme.rcpy".
 
 DATA DIVISION.
    WORKING-STORAGE SECTION.
@@ -40,10 +40,10 @@ DATA DIVISION.
 PROCEDURE DIVISION.
 
    RENDER-NAV.
-      COPY FROM "components/nav.rcl".
+      COPY FROM "components/nav.rcpy".
 
    LOAD-COMPONENTS.
-      COPY FROM "components/pricing-card.rcl".
+      COPY FROM "components/pricing-card.rcpy".
 
    RENDER-HEADER.
       DISPLAY SECTION ID "header"
@@ -76,6 +76,6 @@ PROCEDURE DIVISION.
       STOP SECTION.
 
    RENDER-FOOTER.
-      COPY FROM "components/footer.rcl".
+      COPY FROM "components/footer.rcpy".
 
    STOP RUN.

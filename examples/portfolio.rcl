@@ -6,7 +6,7 @@ IDENTIFICATION DIVISION.
    DESCRIPTION.   "RECALL language — built different.".
 
 ENVIRONMENT DIVISION.
-   COPY FROM "theme.rcl".
+   COPY FROM "theme.rcpy".
 
 DATA DIVISION.
    WORKING-STORAGE SECTION.
