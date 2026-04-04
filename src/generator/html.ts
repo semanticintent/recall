@@ -133,9 +133,20 @@ footer { padding: 40px 0; border-top: 1px solid var(--border); }
 footer p { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); max-width: 100%; }
 footer.align-center { text-align: center; }
 footer.align-right  { text-align: right; }
+.layout-sidebar { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; align-items: start; }
+.sidebar-rail { border-right: 1px solid var(--border); padding: 32px 0; }
+.sidebar-rail.sticky { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.sidebar-logo { padding: 0 24px 24px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); margin-bottom: 24px; display: block; }
+.sidebar-group { margin-bottom: 28px; padding: 0 24px; }
+.sidebar-group-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: block; }
+.sidebar-link { display: block; font-size: 13px; color: var(--muted); padding: 5px 0; transition: color 0.15s; font-family: var(--font-mono); }
+.sidebar-link:hover { color: var(--accent); opacity: 1; }
+.sidebar-content { padding: 48px; min-width: 0; }
 @media (max-width: 768px) {
   .layout-grid.cols-2, .layout-grid.cols-3 { grid-template-columns: 1fr; }
   .nav-links { gap: 16px; }
+  .layout-sidebar { grid-template-columns: 1fr; }
+  .sidebar-rail { display: none; }
 }
 `
 }
@@ -216,16 +227,67 @@ function renderComponent(
   return renderStatementWithRegistry(bound, data, registry)
 }
 
+function renderSidebarNav(stmt: DisplayStatement, data: DataDivision): string {
+  const logo      = clause(stmt.clauses, 'LOGO')
+  const sticky    = clause(stmt.clauses, 'STICKY', 'NO') === 'YES'
+  const groupName = clause(stmt.clauses, 'USING')
+  const group     = resolveGroup(groupName, data)
+
+  const groups: string[] = []
+
+  if (group) {
+    for (const section of group.children) {
+      const labelField = section.children.find(f => f.name.endsWith('LABEL') || f.name === 'GROUP-LABEL')
+      const label = labelField?.value ?? section.name
+
+      const links: { label: string; href: string }[] = []
+      let i = 0
+      while (i < section.children.length) {
+        const f = section.children[i]
+        if (f.name.match(/NAV-LINK-\d+$/) || f.name.match(/LINK-\d+$/)) {
+          const hrefField = section.children[i + 1]
+          links.push({ label: f.value, href: hrefField?.value ?? '#' })
+          i += 2
+        } else {
+          i++
+        }
+      }
+
+      groups.push(`<div class="sidebar-group">
+    <span class="sidebar-group-label">${escapeHtml(label)}</span>
+    ${links.map(l => `<a href="${escapeHtml(l.href)}" class="sidebar-link">${escapeHtml(l.label)}</a>`).join('\n    ')}
+  </div>`)
+    }
+  }
+
+  return `<aside class="sidebar-rail${sticky ? ' sticky' : ''}">
+  ${logo ? `<span class="sidebar-logo">${escapeHtml(logo)}</span>` : ''}
+  ${groups.join('\n  ')}
+</aside>`
+}
+
 function renderSection(stmt: DisplayStatement, data: DataDivision, registry: ComponentRegistry = new Map()): string {
-  const id         = clause(stmt.clauses, 'ID')
-  const layout     = clause(stmt.clauses, 'LAYOUT', 'STACK').toLowerCase()
-  const padding    = clause(stmt.clauses, 'PADDING', 'MEDIUM').toLowerCase()
-  const columns    = clause(stmt.clauses, 'COLUMNS', '1')
-  const bg         = clause(stmt.clauses, 'BACKGROUND')
+  const id      = clause(stmt.clauses, 'ID')
+  const layout  = clause(stmt.clauses, 'LAYOUT', 'STACK').toLowerCase()
+  const padding = clause(stmt.clauses, 'PADDING', 'MEDIUM').toLowerCase()
+  const columns = clause(stmt.clauses, 'COLUMNS', '1')
+  const bg      = clause(stmt.clauses, 'BACKGROUND')
+  const style   = bg ? ` style="background:var(--${bg.replace('COLOR-', '').toLowerCase()})"` : ''
+
+  if (layout === 'sidebar') {
+    const sidebarStmt  = stmt.children.find(c => c.element === 'SIDEBAR-NAV')
+    const contentStmts = stmt.children.filter(c => c.element !== 'SIDEBAR-NAV')
+    const sidebarHtml  = sidebarStmt ? renderSidebarNav(sidebarStmt, data) : '<aside class="sidebar-rail"></aside>'
+    const contentHtml  = contentStmts.map(c => renderStatementWithRegistry(c, data, registry)).join('\n    ')
+    return `<div${id ? ` id="${escapeHtml(id)}"` : ''} class="layout-sidebar"${style}>
+  ${sidebarHtml}
+  <main class="sidebar-content">
+    ${contentHtml}
+  </main>
+</div>`
+  }
 
   const layoutClass = `layout-${layout}${layout === 'grid' ? ` cols-${columns}` : ''}`
-  const style = bg ? ` style="background:var(--${bg.replace('COLOR-', '').toLowerCase()})"` : ''
-
   const inner = stmt.children.map(c => renderStatementWithRegistry(c, data, registry)).join('\n  ')
 
   return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="padding-${padding}"${style}>
@@ -377,8 +439,9 @@ function renderStatementWithRegistry(
     case 'BUTTON':      return renderButton(stmt, data)
     case 'CARD-LIST':   return renderCardList(stmt, data)
     case 'INPUT':       return renderInput(stmt)
-    case 'NAVIGATION':  return renderNavigation(stmt, data)
-    case 'SECTION':     return renderSection(stmt, data, registry)
+    case 'NAVIGATION':   return renderNavigation(stmt, data)
+    case 'SIDEBAR-NAV':  return renderSidebarNav(stmt, data)
+    case 'SECTION':      return renderSection(stmt, data, registry)
     case 'FOOTER':      return renderFooter(stmt, data)
     case 'DIVIDER':     return renderDivider(stmt)
     case 'BANNER':      return renderBanner(stmt, data)

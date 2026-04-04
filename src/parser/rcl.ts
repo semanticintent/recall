@@ -340,7 +340,7 @@ function joinContinuationLines(lines: string[]): string[] {
 function parseProcedure(lines: string[]): ProcedureDivision {
   const sections: ProcedureSection[] = []
   let current: ProcedureSection | null = null
-  let currentSection: DisplayStatement | null = null
+  const sectionStack: DisplayStatement[] = []
   const joined = joinContinuationLines(lines)
 
   for (const line of joined) {
@@ -351,34 +351,42 @@ function parseProcedure(lines: string[]): ProcedureDivision {
       const name = line.replace(/\.$/, '').trim()
       if (name) {
         current = { name, statements: [] }
-        currentSection = null
+        sectionStack.length = 0
         sections.push(current)
         continue
       }
     }
 
     if (line === 'STOP SECTION.') {
-      currentSection = null
+      sectionStack.pop()
       continue
     }
 
     if (line.startsWith('DISPLAY') && current) {
       const tokens = line.replace(/\.$/, '').split(/\s+/)
       const stmt = parseDisplayStatement(tokens)
+      const parent = sectionStack.length > 0 ? sectionStack[sectionStack.length - 1] : null
       if (stmt.element === 'SECTION') {
-        current.statements.push(stmt)
-        currentSection = stmt
-      } else if (currentSection) {
-        currentSection.children.push(stmt)
+        if (parent) {
+          parent.children.push(stmt)
+        } else {
+          current.statements.push(stmt)
+        }
+        sectionStack.push(stmt)
       } else {
-        current.statements.push(stmt)
+        if (parent) {
+          parent.children.push(stmt)
+        } else {
+          current.statements.push(stmt)
+        }
       }
     } else if (line.startsWith('COPY FROM') && current) {
       const tokens = line.replace(/\.$/, '').split(/\s+/)
       const filePath = extractString(tokens.slice(2).join(' '))
       const stmt: DisplayStatement = { element: 'COPY', value: filePath, clauses: [], children: [] }
-      if (currentSection) {
-        currentSection.children.push(stmt)
+      const parent = sectionStack.length > 0 ? sectionStack[sectionStack.length - 1] : null
+      if (parent) {
+        parent.children.push(stmt)
       } else {
         current.statements.push(stmt)
       }

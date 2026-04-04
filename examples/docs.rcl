@@ -1,0 +1,86 @@
+IDENTIFICATION DIVISION.
+   PROGRAM-ID.    RECALL-DOCS.
+   AUTHOR.        SEMANTICINTENT.
+   DATE-WRITTEN.  2026-04-04.
+   PAGE-TITLE.    "RECALL Documentation".
+   DESCRIPTION.   "The RECALL language reference.".
+
+ENVIRONMENT DIVISION.
+   COPY FROM "theme.rcpy".
+
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+      01 INTRO-HEAD  PIC X(40)  VALUE "Introduction".
+      01 INTRO-BODY  PIC X(200) VALUE "RECALL is a declarative web interface language with COBOL-inspired syntax. It transpiles .rcl source files to self-contained, zero-dependency HTML. The source is always embedded in the output.".
+      01 WHY-HEAD    PIC X(40)  VALUE "Why COBOL syntax?".
+      01 WHY-BODY    PIC X(200) VALUE "COBOL has been encoding business intent in plain English since 1959. RECALL borrows its division structure, verbose naming, and explicit data declarations — because readability is a feature, not a liability.".
+      01 INSTALL-CMD PIC X(50)  VALUE "npm install -g @semanticintent/recall".
+      01 COMPILE-CMD PIC X(40)  VALUE "recall compile my-site.rcl".
+      01 BUILD-CMD   PIC X(40)  VALUE "recall build src/ --out public/".
+
+   ITEMS SECTION.
+      01 DOC-NAV.
+         05 NAV-SECTION-1.
+            10 GROUP-LABEL      PIC X(30) VALUE "GETTING STARTED".
+            10 NAV-LINK-1       PIC X(30) VALUE "Introduction".
+            10 NAV-LINK-1-HREF  PIC X(80) VALUE "#intro".
+            10 NAV-LINK-2       PIC X(30) VALUE "Installation".
+            10 NAV-LINK-2-HREF  PIC X(80) VALUE "#install".
+         05 NAV-SECTION-2.
+            10 GROUP-LABEL      PIC X(30) VALUE "LANGUAGE".
+            10 NAV-LINK-1       PIC X(30) VALUE "Divisions".
+            10 NAV-LINK-1-HREF  PIC X(80) VALUE "#divisions".
+            10 NAV-LINK-2       PIC X(30) VALUE "Elements".
+            10 NAV-LINK-2-HREF  PIC X(80) VALUE "#elements".
+            10 NAV-LINK-3       PIC X(30) VALUE "Copybooks".
+            10 NAV-LINK-3-HREF  PIC X(80) VALUE "#copybooks".
+         05 NAV-SECTION-3.
+            10 GROUP-LABEL      PIC X(30) VALUE "CLI".
+            10 NAV-LINK-1       PIC X(30) VALUE "recall compile".
+            10 NAV-LINK-1-HREF  PIC X(80) VALUE "#compile".
+            10 NAV-LINK-2       PIC X(30) VALUE "recall build".
+            10 NAV-LINK-2-HREF  PIC X(80) VALUE "#build".
+            10 NAV-LINK-3       PIC X(30) VALUE "recall check".
+            10 NAV-LINK-3-HREF  PIC X(80) VALUE "#check".
+
+PROCEDURE DIVISION.
+
+   RENDER-LAYOUT.
+      DISPLAY SECTION ID "docs-layout"
+         WITH LAYOUT SIDEBAR
+         WITH PADDING NONE.
+
+         DISPLAY SIDEBAR-NAV USING DOC-NAV
+            WITH LOGO "RECALL"
+            WITH STICKY YES.
+
+         DISPLAY SECTION ID "intro"
+            WITH LAYOUT STACK
+            WITH PADDING LARGE.
+            DISPLAY LABEL "GETTING STARTED".
+            DISPLAY HEADING-1 INTRO-HEAD.
+            DISPLAY PARAGRAPH INTRO-BODY.
+            DISPLAY DIVIDER.
+            DISPLAY HEADING-2 WHY-HEAD.
+            DISPLAY PARAGRAPH WHY-BODY.
+         STOP SECTION.
+
+      STOP SECTION.
+
+   RENDER-INSTALL.
+      DISPLAY SECTION ID "install"
+         WITH LAYOUT STACK
+         WITH PADDING MEDIUM.
+         DISPLAY LABEL "INSTALLATION".
+         DISPLAY HEADING-2 "Install the CLI".
+         DISPLAY CODE-BLOCK INSTALL-CMD
+            WITH LANGUAGE "bash".
+         DISPLAY HEADING-2 "Compile a file".
+         DISPLAY CODE-BLOCK COMPILE-CMD
+            WITH LANGUAGE "bash".
+         DISPLAY HEADING-2 "Build a site".
+         DISPLAY CODE-BLOCK BUILD-CMD
+            WITH LANGUAGE "bash".
+      STOP SECTION.
+
+   STOP RUN.
