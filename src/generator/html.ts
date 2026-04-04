@@ -84,7 +84,8 @@ a:hover { opacity: 0.8; }
 nav { padding: 16px 0; border-bottom: 1px solid var(--border); }
 nav.sticky { position: sticky; top: 0; z-index: 100; background: var(--bg); }
 .nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 900px; margin: 0 auto; padding: 0 24px; }
-.nav-logo { font-weight: 600; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--text); }
+.nav-logo { font-weight: 600; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--text); cursor: pointer; transition: color 0.15s; }
+.nav-logo:hover { color: var(--accent); opacity: 1; }
 .nav-links { display: flex; gap: 32px; }
 .nav-links a { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
 .nav-links a:hover { color: var(--text); }
