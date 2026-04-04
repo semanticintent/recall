@@ -1,0 +1,20 @@
+* ─────────────────────────────────────────────────────────
+* RECALL Default Theme
+* COPY FROM "theme.rcl" in any ENVIRONMENT DIVISION
+* Page-level settings declared after COPY override these defaults.
+* ─────────────────────────────────────────────────────────
+
+ENVIRONMENT DIVISION.
+   CONFIGURATION SECTION.
+      VIEWPORT         RESPONSIVE.
+      COLOR-MODE       DARK.
+      FONT-PRIMARY     "IBM Plex Mono".
+      FONT-SECONDARY   "IBM Plex Sans".
+      LANGUAGE         EN.
+
+   PALETTE SECTION.
+      01 COLOR-ACCENT    PIC X(7) VALUE "#00FF41".
+      01 COLOR-BG        PIC X(7) VALUE "#080808".
+      01 COLOR-TEXT      PIC X(7) VALUE "#E0E0E0".
+      01 COLOR-MUTED     PIC X(7) VALUE "#888888".
+      01 COLOR-BORDER    PIC X(7) VALUE "#1A1A1A".

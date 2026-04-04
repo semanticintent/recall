@@ -49,6 +49,61 @@ function resolveIncludes(program: ReturnType<typeof parse>, dir: string): void {
   }
 }
 
+// ─────────────────────────────────────────────────────────
+// Theme inheritance — COPY FROM in ENVIRONMENT DIVISION
+// Runs as a source pre-process before parse()
+// ─────────────────────────────────────────────────────────
+
+const DIVISION_STARTS = [
+  'IDENTIFICATION DIVISION',
+  'ENVIRONMENT DIVISION',
+  'DATA DIVISION',
+  'COMPONENT DIVISION',
+  'PROCEDURE DIVISION',
+]
+
+function extractEnvContent(source: string): string[] {
+  const lines = source.split('\n')
+  const result: string[] = []
+  let inEnv = false
+  for (const line of lines) {
+    const t = line.trim()
+    if (t.startsWith('ENVIRONMENT DIVISION')) { inEnv = true; continue }
+    if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('ENVIRONMENT DIVISION'))) {
+      inEnv = false; continue
+    }
+    if (inEnv) result.push(line)
+  }
+  return result
+}
+
+function resolveThemeCopies(source: string, dir: string): string {
+  const lines = source.split('\n')
+  const result: string[] = []
+  let inEnv = false
+
+  for (const line of lines) {
+    const t = line.trim()
+    if (t.startsWith('ENVIRONMENT DIVISION')) { inEnv = true; result.push(line); continue }
+    if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('ENVIRONMENT DIVISION'))) {
+      inEnv = false; result.push(line); continue
+    }
+
+    if (inEnv && t.startsWith('COPY FROM')) {
+      const match = t.match(/COPY FROM\s+"([^"]+)"/)
+      if (match) {
+        const filePath = resolve(dir, match[1])
+        const themeSource = readFileSync(filePath, 'utf-8')
+        result.push(...extractEnvContent(themeSource))
+      }
+    } else {
+      result.push(line)
+    }
+  }
+
+  return result.join('\n')
+}
+
 export interface CompileResult {
   ok: boolean
   inputPath: string
@@ -82,7 +137,8 @@ export function compile(inputPath: string, outDir?: string): CompileResult {
 
   let program
   try {
-    program = parse(source)
+    const merged = resolveThemeCopies(source, dirname(absInput))
+    program = parse(merged)
     resolveIncludes(program, dirname(absInput))
   } catch (err) {
     return { ok: false, inputPath: absInput, error: `PARSE ERROR: ${(err as Error).message}` }
@@ -128,7 +184,8 @@ export function check(inputPath: string): CheckResult {
   }
 
   try {
-    const program = parse(source)
+    const merged = resolveThemeCopies(source, dirname(absInput))
+    const program = parse(merged)
 
     if (!program.identification.programId) {
       errors.push('IDENTIFICATION DIVISION: PROGRAM-ID IS REQUIRED.')
