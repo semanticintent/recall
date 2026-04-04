@@ -260,7 +260,8 @@ function renderParagraph(stmt: DisplayStatement, data: DataDivision): string {
 
 function renderButton(stmt: DisplayStatement, data: DataDivision): string {
   const text    = escapeHtml(resolveValue(stmt.value, data))
-  const href    = clause(stmt.clauses, 'ON-CLICK') || clause(stmt.clauses, 'HREF', '#')
+  const rawHref = clause(stmt.clauses, 'ON-CLICK') || clause(stmt.clauses, 'HREF', '#')
+  const href    = resolveValue(rawHref, data) || rawHref
   const style   = clause(stmt.clauses, 'STYLE', 'PRIMARY').toLowerCase()
   const size    = clause(stmt.clauses, 'SIZE', '').toLowerCase()
   return `<a href="${escapeHtml(href)}" class="recall-btn ${style}${size ? ` size-${size}` : ''}">${text}</a>`

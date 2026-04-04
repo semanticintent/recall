@@ -167,7 +167,7 @@ pre.code-block { font-family: var(--font-mono); font-size: 13px; background: rgb
 .card.hover-lift { transition: transform 0.2s, border-color 0.2s; }
 .card.hover-lift:hover { transform: translateY(-3px); border-color: var(--accent); }
 .card h3 { font-family: var(--font-mono); font-size: 14px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-.card p { font-size: 14px; margin-bottom: 12px; }
+.card p { font-size: 14px; margin-bottom: 12px; color: rgba(224,224,224,0.75); }
 .card-tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
 .card a { display: block; color: inherit; text-decoration: none; height: 100%; }
 .recall-divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
@@ -191,9 +191,9 @@ footer.align-right  { text-align: right; }
   </style>
 </head>
 <body id="recall-portfolio">
-<nav class="">
+<nav class=" sticky">
   <div class="nav-inner">
-    
+    <span class="nav-logo">RECALL</span>
     <div class="nav-links">
       <a href="#about">ABOUT</a>
         <a href="#spec">SPEC</a>
@@ -201,37 +201,33 @@ footer.align-right  { text-align: right; }
     </div>
   </div>
 </nav>
-<section id="hero" class="padding-medium">
-  <div class="container layout-stack">
-  
+<section id="hero" class="padding-large">
+  <div class="container layout-centered">
+  <h1 class="style-mono">STILL HERE. STILL RUNNING.</h1>
+  <p class="color-muted">RECALL is a declarative web interface language with COBOL-inspired syntax. The source is the artifact.</p>
+  <a href="#spec" class="recall-btn primary">VIEW THE SPEC</a>
   </div>
 </section>
-<h1>STILL HERE. STILL RUNNING.</h1>
-<p>RECALL is a declarative web interface language with COBOL-inspired syntax. The source is the artifact.</p>
-<a href="#" class="recall-btn primary">VIEW THE SPEC</a>
 <section id="spec" class="padding-medium">
   <div class="container layout-stack">
-  
-  </div>
-</section>
-<div class="recall-label">&quot;DESIGN</div>
-<h2>&quot;What</h2>
-<div class="layout-grid cols-1 style-bordered">
-    <div class="card">
+  <div class="recall-label">DESIGN PRINCIPLES</div>
+  <h2>What RECALL believes</h2>
+  <div class="layout-grid cols-3 style-bordered">
+    <div class="card hover-lift">
       <a href="#spec">
         <h3>THE SOURCE IS THE ARTIFACT</h3>
         <p>Every compiled .html file embeds its .rcl source in a comment block. View source to see the origin.</p>
         <span class="card-tag">CORE PRINCIPLE</span>
       </a>
     </div>
-    <div class="card">
+    <div class="card hover-lift">
       <a href="#spec">
         <h3>NO DEPENDENCIES</h3>
         <p>Output is a single HTML file. Inline CSS. Vanilla JS where needed. Zero external links.</p>
         <span class="card-tag">ZERO DEPS</span>
       </a>
     </div>
-    <div class="card">
+    <div class="card hover-lift">
       <a href="#spec">
         <h3>VERBOSE IS A FEATURE</h3>
         <p>COBOL's English-like verbosity is intentional legibility. The source reads like a document.</p>
@@ -239,9 +235,11 @@ footer.align-right  { text-align: right; }
       </a>
     </div>
   </div>
-<footer class="align-left">
+  </div>
+</section>
+<footer class="align-center">
   <div class="container">
-    <p></p>
+    <p>COMPILED WITH RECALL 0.1. THE SOURCE IS EMBEDDED ABOVE.</p>
   </div>
 </footer>
 </body>
