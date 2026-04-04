@@ -1,0 +1,93 @@
+IDENTIFICATION DIVISION.
+   PROGRAM-ID.  RECALL-PRICING.
+   PAGE-TITLE.  "RECALL — Pricing".
+   DESCRIPTION. "Simple pricing for a simple language.".
+
+ENVIRONMENT DIVISION.
+   CONFIGURATION SECTION.
+      VIEWPORT    RESPONSIVE.
+      COLOR-MODE  DARK.
+      LANGUAGE    EN.
+      FONT-PRIMARY    "IBM Plex Mono".
+      FONT-SECONDARY  "IBM Plex Sans".
+
+   PALETTE SECTION.
+      01 COLOR-ACCENT  PIC X(7) VALUE "#00FF41".
+      01 COLOR-BG      PIC X(7) VALUE "#080808".
+      01 COLOR-TEXT    PIC X(7) VALUE "#E0E0E0".
+      01 COLOR-MUTED   PIC X(7) VALUE "#888888".
+      01 COLOR-BORDER  PIC X(7) VALUE "#1A1A1A".
+
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+      01 PAGE-HEAD     PIC X(30) VALUE "Simple pricing.".
+      01 PAGE-SUBHEAD  PIC X(60) VALUE "One language. One file. No surprises.".
+
+   ITEMS SECTION.
+      01 FREE-FEATURES.
+         05 FEAT-1.
+            10 PROJ-TITLE PIC X(40) VALUE "recall compile".
+            10 PROJ-HREF  PIC X(80) VALUE "#".
+         05 FEAT-2.
+            10 PROJ-TITLE PIC X(40) VALUE "recall check".
+            10 PROJ-HREF  PIC X(80) VALUE "#".
+         05 FEAT-3.
+            10 PROJ-TITLE PIC X(40) VALUE "COPY components".
+            10 PROJ-HREF  PIC X(80) VALUE "#".
+
+      01 PRO-FEATURES.
+         05 FEAT-1.
+            10 PROJ-TITLE PIC X(40) VALUE "Everything in Open Source".
+            10 PROJ-HREF  PIC X(80) VALUE "#".
+         05 FEAT-2.
+            10 PROJ-TITLE PIC X(40) VALUE "recall build (multi-page)".
+            10 PROJ-HREF  PIC X(80) VALUE "#".
+         05 FEAT-3.
+            10 PROJ-TITLE PIC X(40) VALUE "COMPONENT DIVISION".
+            10 PROJ-HREF  PIC X(80) VALUE "#".
+         05 FEAT-4.
+            10 PROJ-TITLE PIC X(40) VALUE "Theme inheritance".
+            10 PROJ-HREF  PIC X(80) VALUE "#".
+
+PROCEDURE DIVISION.
+
+   RENDER-NAV.
+      COPY FROM "components/nav.rcl".
+
+   LOAD-COMPONENTS.
+      COPY FROM "components/pricing-card.rcl".
+
+   RENDER-HEADER.
+      DISPLAY SECTION ID "header"
+         WITH LAYOUT CENTERED
+         WITH PADDING LARGE.
+         DISPLAY HEADING-1 PAGE-HEAD
+            WITH STYLE MONO.
+         DISPLAY PARAGRAPH PAGE-SUBHEAD.
+      STOP SECTION.
+
+   RENDER-PRICING.
+      DISPLAY SECTION ID "pricing"
+         WITH LAYOUT GRID
+         WITH COLUMNS 2
+         WITH PADDING MEDIUM.
+         DISPLAY PRICING-CARD
+            WITH TIER "OPEN SOURCE"
+            WITH PRICE "$0"
+            WITH PERIOD "FREE FOREVER"
+            WITH FEATURES FREE-FEATURES
+            WITH CTA-LABEL "GET STARTED"
+            WITH CTA-HREF "https://github.com/semanticintent/recall".
+         DISPLAY PRICING-CARD
+            WITH TIER "PRO"
+            WITH PRICE "COMING SOON"
+            WITH PERIOD "IN DEVELOPMENT"
+            WITH FEATURES PRO-FEATURES
+            WITH CTA-LABEL "FOLLOW ALONG"
+            WITH CTA-HREF "https://github.com/semanticintent/recall".
+      STOP SECTION.
+
+   RENDER-FOOTER.
+      COPY FROM "components/footer.rcl".
+
+   STOP RUN.

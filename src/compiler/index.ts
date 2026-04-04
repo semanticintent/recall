@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve, basename, dirname, join } from 'node:path'
 import { parse } from '../parser/rcl.js'
 import { generate } from '../generator/html.js'
-import type { DataDivision, DisplayStatement } from '../parser/rcl.js'
+import type { DataDivision, ComponentDivision, DisplayStatement } from '../parser/rcl.js'
 
 // ─────────────────────────────────────────────────────────
 // COPY resolution — merges component files into the AST
@@ -15,6 +15,7 @@ import type { DataDivision, DisplayStatement } from '../parser/rcl.js'
 function resolveStatementsInPlace(
   statements: DisplayStatement[],
   data: DataDivision,
+  component: ComponentDivision,
   dir: string,
 ): void {
   let i = 0
@@ -23,18 +24,19 @@ function resolveStatementsInPlace(
     if (stmt.element === 'COPY') {
       const filePath = resolve(dir, stmt.value!)
       const componentSource = readFileSync(filePath, 'utf-8')
-      const component = parse(componentSource)
-      // Merge component data into parent
-      data.workingStorage.push(...component.data.workingStorage)
-      data.items.push(...component.data.items)
-      // Inline all component procedure statements (flatten sections)
-      const inlined = component.procedure.sections.flatMap(s => s.statements)
+      const imported = parse(componentSource)
+      // Merge data
+      data.workingStorage.push(...imported.data.workingStorage)
+      data.items.push(...imported.data.items)
+      // Merge component definitions
+      component.components.push(...imported.component.components)
+      // Inline procedure statements
+      const inlined = imported.procedure.sections.flatMap(s => s.statements)
       statements.splice(i, 1, ...inlined)
       i += inlined.length
     } else {
-      // Recurse into SECTION children so COPY works inside DISPLAY SECTION too
       if (stmt.children.length > 0) {
-        resolveStatementsInPlace(stmt.children, data, dir)
+        resolveStatementsInPlace(stmt.children, data, component, dir)
       }
       i++
     }
@@ -43,7 +45,7 @@ function resolveStatementsInPlace(
 
 function resolveIncludes(program: ReturnType<typeof parse>, dir: string): void {
   for (const section of program.procedure.sections) {
-    resolveStatementsInPlace(section.statements, program.data, dir)
+    resolveStatementsInPlace(section.statements, program.data, program.component, dir)
   }
 }
 

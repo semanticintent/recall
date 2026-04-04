@@ -2,12 +2,13 @@
 // RECALL Parser — .rcl source → ReclProgram AST
 // ─────────────────────────────────────────────────────────
 
-export type Division = 'IDENTIFICATION' | 'ENVIRONMENT' | 'DATA' | 'PROCEDURE'
+export type Division = 'IDENTIFICATION' | 'ENVIRONMENT' | 'DATA' | 'PROCEDURE' | 'COMPONENT'
 
 export interface ReclProgram {
   identification: IdentificationDivision
   environment: EnvironmentDivision
   data: DataDivision
+  component: ComponentDivision
   procedure: ProcedureDivision
 }
 
@@ -45,6 +46,16 @@ export interface DataDivision {
   items: DataField[]
 }
 
+export interface ComponentDef {
+  name: string
+  accepts: string[]
+  body: DisplayStatement
+}
+
+export interface ComponentDivision {
+  components: ComponentDef[]
+}
+
 export type DisplayElement =
   | 'HEADING-1' | 'HEADING-2' | 'HEADING-3'
   | 'PARAGRAPH' | 'LABEL' | 'CODE-BLOCK'
@@ -59,7 +70,7 @@ export interface DisplayClause {
 }
 
 export interface DisplayStatement {
-  element: DisplayElement
+  element: DisplayElement | string
   value?: string        // variable name or literal
   clauses: DisplayClause[]
   children: DisplayStatement[]
@@ -119,6 +130,7 @@ function detectDivision(line: string): Division | null {
   if (t.startsWith('IDENTIFICATION DIVISION')) return 'IDENTIFICATION'
   if (t.startsWith('ENVIRONMENT DIVISION'))   return 'ENVIRONMENT'
   if (t.startsWith('DATA DIVISION'))          return 'DATA'
+  if (t.startsWith('COMPONENT DIVISION'))     return 'COMPONENT'
   if (t.startsWith('PROCEDURE DIVISION'))     return 'PROCEDURE'
   return null
 }
@@ -298,9 +310,6 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
 }
 
 function joinContinuationLines(lines: string[]): string[] {
-  // Merge lines that are continuation of a DISPLAY statement
-  // A DISPLAY statement continues as long as the next line doesn't start
-  // a new keyword (section header, STOP, another DISPLAY)
   const joined: string[] = []
   let current = ''
 
@@ -312,13 +321,15 @@ function joinContinuationLines(lines: string[]): string[] {
       line.startsWith('DISPLAY') ||
       line.startsWith('STOP') ||
       line.startsWith('COPY FROM') ||
+      line.startsWith('DEFINE ') ||
+      line.startsWith('END DEFINE') ||
+      line.startsWith('ACCEPTS ') ||
       (!line.includes(' ') && line.endsWith('.')) // section header
 
     if (isNewStatement) {
       if (current) joined.push(current)
       current = line
     } else {
-      // continuation — append to current
       current = current ? `${current} ${line}` : line
     }
   }
@@ -363,7 +374,6 @@ function parseProcedure(lines: string[]): ProcedureDivision {
         current.statements.push(stmt)
       }
     } else if (line.startsWith('COPY FROM') && current) {
-      // COPY FROM "path/to/component.rcl"
       const tokens = line.replace(/\.$/, '').split(/\s+/)
       const filePath = extractString(tokens.slice(2).join(' '))
       const stmt: DisplayStatement = { element: 'COPY', value: filePath, clauses: [], children: [] }
@@ -378,6 +388,57 @@ function parseProcedure(lines: string[]): ProcedureDivision {
   return { sections }
 }
 
+function parseComponentDivision(lines: string[]): ComponentDivision {
+  const components: ComponentDef[] = []
+  const joined = joinContinuationLines(lines)
+
+  let i = 0
+  while (i < joined.length) {
+    const line = joined[i]
+
+    if (line.startsWith('DEFINE ')) {
+      const name = line.replace(/^DEFINE\s+/, '').replace(/\.$/, '').trim()
+      let accepts: string[] = []
+      // wrapper SECTION that holds all body children
+      const body: DisplayStatement = { element: 'SECTION', clauses: [], children: [] }
+      let currentSection: DisplayStatement = body
+      i++
+
+      while (i < joined.length && joined[i] !== 'END DEFINE.') {
+        const inner = joined[i]
+
+        if (inner.startsWith('ACCEPTS ')) {
+          const raw = inner.replace(/^ACCEPTS\s+/, '').replace(/\.$/, '')
+          accepts = raw.split(/[\s,]+/).filter(Boolean)
+        } else if (inner.startsWith('DISPLAY')) {
+          const tokens = inner.replace(/\.$/, '').split(/\s+/)
+          const stmt = parseDisplayStatement(tokens)
+          if (stmt.element === 'SECTION') {
+            // Replace the body wrapper with this explicit SECTION
+            body.element = 'SECTION'
+            body.clauses = stmt.clauses
+            body.value   = stmt.value
+            currentSection = body
+          } else {
+            currentSection.children.push(stmt)
+          }
+        } else if (inner === 'STOP SECTION.') {
+          // back to top-level body if nested
+          currentSection = body
+        }
+
+        i++
+      }
+
+      components.push({ name, accepts, body })
+    }
+
+    i++
+  }
+
+  return { components }
+}
+
 // ─────────────────────────────────────────────────────────
 // Main parse entry point
 // ─────────────────────────────────────────────────────────
@@ -385,11 +446,11 @@ function parseProcedure(lines: string[]): ProcedureDivision {
 export function parse(source: string): ReclProgram {
   const rawLines = source.split('\n')
 
-  // Split into division buckets
   const buckets: Record<Division, string[]> = {
     IDENTIFICATION: [],
     ENVIRONMENT:    [],
     DATA:           [],
+    COMPONENT:      [],
     PROCEDURE:      [],
   }
 
@@ -405,6 +466,7 @@ export function parse(source: string): ReclProgram {
     identification: parseIdentification(buckets.IDENTIFICATION),
     environment:    parseEnvironment(buckets.ENVIRONMENT),
     data:           parseData(buckets.DATA),
+    component:      parseComponentDivision(buckets.COMPONENT),
     procedure:      parseProcedure(buckets.PROCEDURE),
   }
 }

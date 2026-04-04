@@ -1,0 +1,287 @@
+<!--
+******************************************************
+* RECALL COMPILED OUTPUT
+* SOURCE: (embedded below)
+* RECALL VERSION: 0.1
+******************************************************
+
+* IDENTIFICATION DIVISION.
+*    PROGRAM-ID.  RECALL-PRICING.
+*    PAGE-TITLE.  "RECALL — Pricing".
+*    DESCRIPTION. "Simple pricing for a simple language.".
+*
+* ENVIRONMENT DIVISION.
+*    CONFIGURATION SECTION.
+*       VIEWPORT    RESPONSIVE.
+*       COLOR-MODE  DARK.
+*       LANGUAGE    EN.
+*       FONT-PRIMARY    "IBM Plex Mono".
+*       FONT-SECONDARY  "IBM Plex Sans".
+*
+*    PALETTE SECTION.
+*       01 COLOR-ACCENT  PIC X(7) VALUE "#00FF41".
+*       01 COLOR-BG      PIC X(7) VALUE "#080808".
+*       01 COLOR-TEXT    PIC X(7) VALUE "#E0E0E0".
+*       01 COLOR-MUTED   PIC X(7) VALUE "#888888".
+*       01 COLOR-BORDER  PIC X(7) VALUE "#1A1A1A".
+*
+* DATA DIVISION.
+*    WORKING-STORAGE SECTION.
+*       01 PAGE-HEAD     PIC X(30) VALUE "Simple pricing.".
+*       01 PAGE-SUBHEAD  PIC X(60) VALUE "One language. One file. No surprises.".
+*
+*    ITEMS SECTION.
+*       01 FREE-FEATURES.
+*          05 FEAT-1.
+*             10 PROJ-TITLE PIC X(40) VALUE "recall compile".
+*             10 PROJ-HREF  PIC X(80) VALUE "#".
+*          05 FEAT-2.
+*             10 PROJ-TITLE PIC X(40) VALUE "recall check".
+*             10 PROJ-HREF  PIC X(80) VALUE "#".
+*          05 FEAT-3.
+*             10 PROJ-TITLE PIC X(40) VALUE "COPY components".
+*             10 PROJ-HREF  PIC X(80) VALUE "#".
+*
+*       01 PRO-FEATURES.
+*          05 FEAT-1.
+*             10 PROJ-TITLE PIC X(40) VALUE "Everything in Open Source".
+*             10 PROJ-HREF  PIC X(80) VALUE "#".
+*          05 FEAT-2.
+*             10 PROJ-TITLE PIC X(40) VALUE "recall build (multi-page)".
+*             10 PROJ-HREF  PIC X(80) VALUE "#".
+*          05 FEAT-3.
+*             10 PROJ-TITLE PIC X(40) VALUE "COMPONENT DIVISION".
+*             10 PROJ-HREF  PIC X(80) VALUE "#".
+*          05 FEAT-4.
+*             10 PROJ-TITLE PIC X(40) VALUE "Theme inheritance".
+*             10 PROJ-HREF  PIC X(80) VALUE "#".
+*
+* PROCEDURE DIVISION.
+*
+*    RENDER-NAV.
+*       COPY FROM "components/nav.rcl".
+*
+*    LOAD-COMPONENTS.
+*       COPY FROM "components/pricing-card.rcl".
+*
+*    RENDER-HEADER.
+*       DISPLAY SECTION ID "header"
+*          WITH LAYOUT CENTERED
+*          WITH PADDING LARGE.
+*          DISPLAY HEADING-1 PAGE-HEAD
+*             WITH STYLE MONO.
+*          DISPLAY PARAGRAPH PAGE-SUBHEAD.
+*       STOP SECTION.
+*
+*    RENDER-PRICING.
+*       DISPLAY SECTION ID "pricing"
+*          WITH LAYOUT GRID
+*          WITH COLUMNS 2
+*          WITH PADDING MEDIUM.
+*          DISPLAY PRICING-CARD
+*             WITH TIER "OPEN SOURCE"
+*             WITH PRICE "$0"
+*             WITH PERIOD "FREE FOREVER"
+*             WITH FEATURES FREE-FEATURES
+*             WITH CTA-LABEL "GET STARTED"
+*             WITH CTA-HREF "https://github.com/semanticintent/recall".
+*          DISPLAY PRICING-CARD
+*             WITH TIER "PRO"
+*             WITH PRICE "COMING SOON"
+*             WITH PERIOD "IN DEVELOPMENT"
+*             WITH FEATURES PRO-FEATURES
+*             WITH CTA-LABEL "FOLLOW ALONG"
+*             WITH CTA-HREF "https://github.com/semanticintent/recall".
+*       STOP SECTION.
+*
+*    RENDER-FOOTER.
+*       COPY FROM "components/footer.rcl".
+*
+*    STOP RUN.
+*
+
+******************************************************
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RECALL — Pricing</title>
+  <meta name="description" content="Simple pricing for a simple language.">
+  
+  
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=IBM%20Plex%20Mono:wght@400;500;600&family=IBM%20Plex%20Sans:wght@300;400;500;600&display=swap');
+:root {
+  --bg: #080808;
+  --text: #E0E0E0;
+  --muted: #888888;
+  --accent: #00FF41;
+  --border: #1A1A1A;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-mono); background: var(--bg); color: var(--text); line-height: 1.7; font-size: 16px; -webkit-font-smoothing: antialiased; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { opacity: 0.8; }
+nav { padding: 16px 0; border-bottom: 1px solid var(--border); }
+nav.sticky { position: sticky; top: 0; z-index: 100; background: var(--bg); }
+.nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.nav-logo { font-weight: 600; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--text); }
+.nav-links { display: flex; gap: 32px; }
+.nav-links a { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.nav-links a:hover { color: var(--text); }
+section { padding: 80px 0; }
+section.padding-small  { padding: 40px 0; }
+section.padding-medium { padding: 60px 0; }
+section.padding-large  { padding: 100px 0; }
+.layout-centered { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.layout-grid { display: grid; gap: 24px; }
+.layout-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.layout-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.layout-flex { display: flex; gap: 24px; flex-wrap: wrap; }
+.layout-stack { display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 600; line-height: 1.1; margin-bottom: 20px; }
+h2 { font-size: clamp(22px, 3vw, 36px); font-weight: 600; line-height: 1.2; margin-bottom: 16px; }
+h3 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+h1.style-mono, h2.style-mono, h3.style-mono { font-family: var(--font-mono); }
+h1.style-sans, h2.style-sans, h3.style-sans { font-family: var(--font-sans); }
+p { font-family: var(--font-sans); color: var(--muted); max-width: 680px; margin-bottom: 16px; line-height: 1.8; }
+p.color-text  { color: var(--text); }
+p.color-accent { color: var(--accent); }
+.recall-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); margin-bottom: 8px; }
+.recall-btn { display: inline-block; padding: 12px 28px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border: none; transition: opacity 0.2s; }
+.recall-btn.primary  { background: var(--accent); color: var(--bg); }
+.recall-btn.ghost    { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.recall-btn.outline  { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+.recall-btn:hover { opacity: 0.85; }
+pre.code-block { font-family: var(--font-mono); font-size: 13px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); padding: 24px; overflow-x: auto; line-height: 1.6; color: var(--accent); margin: 16px 0; }
+.card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 28px 24px; }
+.card.hover-lift { transition: transform 0.2s, border-color 0.2s; }
+.card.hover-lift:hover { transform: translateY(-3px); border-color: var(--accent); }
+.card h3 { font-family: var(--font-mono); font-size: 14px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.card p { font-size: 14px; margin-bottom: 12px; color: rgba(224,224,224,0.75); }
+.card-tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+.card a { display: block; color: inherit; text-decoration: none; height: 100%; }
+.recall-divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+.recall-divider.dashed { border-top-style: dashed; }
+.recall-divider.spacing-small  { margin: 20px 0; }
+.recall-divider.spacing-large  { margin: 80px 0; }
+.recall-input-group { margin-bottom: 20px; }
+.recall-input-group label { display: block; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; font-family: var(--font-mono); }
+.recall-input-group input, .recall-input-group textarea { width: 100%; background: transparent; border: 1px solid var(--border); color: var(--text); font-family: var(--font-mono); font-size: 14px; padding: 10px 14px; outline: none; resize: vertical; }
+.recall-input-group input:focus, .recall-input-group textarea:focus { border-color: var(--accent); }
+.recall-banner { padding: 12px 24px; background: var(--accent); color: var(--bg); font-family: var(--font-mono); font-size: 13px; letter-spacing: 1px; text-align: center; }
+footer { padding: 40px 0; border-top: 1px solid var(--border); }
+footer p { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); max-width: 100%; }
+footer.align-center { text-align: center; }
+footer.align-right  { text-align: right; }
+@media (max-width: 768px) {
+  .layout-grid.cols-2, .layout-grid.cols-3 { grid-template-columns: 1fr; }
+  .nav-links { gap: 16px; }
+}
+
+  </style>
+</head>
+<body id="recall-pricing">
+<nav class=" sticky">
+  <div class="nav-inner">
+    <span class="nav-logo">RECALL</span>
+    <div class="nav-links">
+      <a href="https://github.com/semanticintent/recall/blob/main/docs/RECALL_SPEC.md">SPEC</a>
+        <a href="https://github.com/semanticintent/recall">GITHUB</a>
+        <a href="https://npmjs.com/package/@semanticintent/recall">NPM</a>
+    </div>
+  </div>
+</nav>
+
+<section id="header" class="padding-large">
+  <div class="container layout-centered">
+  <h1 class="style-mono">Simple pricing.</h1>
+  <p>One language. One file. No surprises.</p>
+  </div>
+</section>
+<section id="pricing" class="padding-medium">
+  <div class="container layout-grid cols-2">
+  <section class="padding-medium">
+  <div class="container layout-stack">
+  <div class="recall-label">FREE FOREVER</div>
+  <h3>OPEN SOURCE</h3>
+  <h2>$0</h2>
+  <div class="layout-grid cols-1 style-bordered">
+    <div class="card">
+      <a href="#">
+        <h3>recall compile</h3>
+        
+        
+      </a>
+    </div>
+    <div class="card">
+      <a href="#">
+        <h3>recall check</h3>
+        
+        
+      </a>
+    </div>
+    <div class="card">
+      <a href="#">
+        <h3>COPY components</h3>
+        
+        
+      </a>
+    </div>
+  </div>
+  <a href="https://github.com/semanticintent/recall" class="recall-btn primary">GET STARTED</a>
+  </div>
+</section>
+  <section class="padding-medium">
+  <div class="container layout-stack">
+  <div class="recall-label">IN DEVELOPMENT</div>
+  <h3>PRO</h3>
+  <h2>COMING SOON</h2>
+  <div class="layout-grid cols-1 style-bordered">
+    <div class="card">
+      <a href="#">
+        <h3>Everything in Open Source</h3>
+        
+        
+      </a>
+    </div>
+    <div class="card">
+      <a href="#">
+        <h3>recall build (multi-page)</h3>
+        
+        
+      </a>
+    </div>
+    <div class="card">
+      <a href="#">
+        <h3>COMPONENT DIVISION</h3>
+        
+        
+      </a>
+    </div>
+    <div class="card">
+      <a href="#">
+        <h3>Theme inheritance</h3>
+        
+        
+      </a>
+    </div>
+  </div>
+  <a href="https://github.com/semanticintent/recall" class="recall-btn primary">FOLLOW ALONG</a>
+  </div>
+</section>
+  </div>
+</section>
+<footer class="align-center">
+  <div class="container">
+    <p>COMPILED WITH RECALL 0.1. THE SOURCE IS EMBEDDED ABOVE.</p>
+  </div>
+</footer>
+</body>
+</html>

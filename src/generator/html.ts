@@ -9,7 +9,10 @@ import type {
   DataField,
   DisplayStatement,
   DisplayClause,
+  ComponentDef,
 } from '../parser/rcl.js'
+
+export type ComponentRegistry = Map<string, ComponentDef>
 
 // ─────────────────────────────────────────────────────────
 // Helpers
@@ -176,18 +179,54 @@ function renderNavigation(stmt: DisplayStatement, data: DataDivision): string {
 </nav>`
 }
 
-function renderSection(stmt: DisplayStatement, data: DataDivision): string {
+// ─────────────────────────────────────────────────────────
+// Component expansion — compile-time parameter binding
+// ─────────────────────────────────────────────────────────
+
+function bindParams(
+  stmt: DisplayStatement,
+  accepts: string[],
+  bindings: Map<string, string>,
+): DisplayStatement {
+  const resolve = (v: string | undefined) =>
+    v !== undefined && accepts.includes(v) ? (bindings.get(v) ?? v) : v
+  return {
+    element:  stmt.element,
+    value:    resolve(stmt.value),
+    clauses:  stmt.clauses.map(c => ({
+      key:   c.key,
+      value: accepts.includes(c.value) ? (bindings.get(c.value) ?? c.value) : c.value,
+    })),
+    children: stmt.children.map(child => bindParams(child, accepts, bindings)),
+  }
+}
+
+function renderComponent(
+  stmt: DisplayStatement,
+  data: DataDivision,
+  def: ComponentDef,
+  registry: ComponentRegistry,
+): string {
+  const bindings = new Map<string, string>()
+  for (const param of def.accepts) {
+    const c = stmt.clauses.find(cl => cl.key === param)
+    if (c) bindings.set(param, c.value)
+  }
+  const bound = bindParams(def.body, def.accepts, bindings)
+  return renderStatementWithRegistry(bound, data, registry)
+}
+
+function renderSection(stmt: DisplayStatement, data: DataDivision, registry: ComponentRegistry = new Map()): string {
   const id         = clause(stmt.clauses, 'ID')
   const layout     = clause(stmt.clauses, 'LAYOUT', 'STACK').toLowerCase()
   const padding    = clause(stmt.clauses, 'PADDING', 'MEDIUM').toLowerCase()
   const columns    = clause(stmt.clauses, 'COLUMNS', '1')
-  const maxWidth   = clause(stmt.clauses, 'MAX-WIDTH', 'STANDARD').toLowerCase()
   const bg         = clause(stmt.clauses, 'BACKGROUND')
 
   const layoutClass = `layout-${layout}${layout === 'grid' ? ` cols-${columns}` : ''}`
   const style = bg ? ` style="background:var(--${bg.replace('COLOR-', '').toLowerCase()})"` : ''
 
-  const inner = stmt.children.map(c => renderStatement(c, data)).join('\n  ')
+  const inner = stmt.children.map(c => renderStatementWithRegistry(c, data, registry)).join('\n  ')
 
   return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="padding-${padding}"${style}>
   <div class="container ${layoutClass}">
@@ -322,7 +361,11 @@ function renderImage(stmt: DisplayStatement, data: DataDivision): string {
 // Main statement dispatcher
 // ─────────────────────────────────────────────────────────
 
-export function renderStatement(stmt: DisplayStatement, data: DataDivision): string {
+function renderStatementWithRegistry(
+  stmt: DisplayStatement,
+  data: DataDivision,
+  registry: ComponentRegistry,
+): string {
   switch (stmt.element) {
     case 'HEADING-1':   return renderHeading(stmt, data, 1)
     case 'HEADING-2':   return renderHeading(stmt, data, 2)
@@ -334,7 +377,7 @@ export function renderStatement(stmt: DisplayStatement, data: DataDivision): str
     case 'CARD-LIST':   return renderCardList(stmt, data)
     case 'INPUT':       return renderInput(stmt)
     case 'NAVIGATION':  return renderNavigation(stmt, data)
-    case 'SECTION':     return renderSection(stmt, data)
+    case 'SECTION':     return renderSection(stmt, data, registry)
     case 'FOOTER':      return renderFooter(stmt, data)
     case 'DIVIDER':     return renderDivider(stmt)
     case 'BANNER':      return renderBanner(stmt, data)
@@ -345,9 +388,16 @@ export function renderStatement(stmt: DisplayStatement, data: DataDivision): str
       const target = clause(stmt.clauses, 'TARGET', 'SELF') === 'BLANK' ? ' target="_blank" rel="noopener"' : ''
       return `<a href="${escapeHtml(href)}"${target}>${text}</a>`
     }
-    default:
+    default: {
+      const def = registry.get(stmt.element)
+      if (def) return renderComponent(stmt, data, def, registry)
       return `<!-- RECALL: unknown element ${stmt.element} -->`
+    }
   }
+}
+
+export function renderStatement(stmt: DisplayStatement, data: DataDivision): string {
+  return renderStatementWithRegistry(stmt, data, new Map())
 }
 
 // ─────────────────────────────────────────────────────────
@@ -355,14 +405,19 @@ export function renderStatement(stmt: DisplayStatement, data: DataDivision): str
 // ─────────────────────────────────────────────────────────
 
 export function generate(program: ReclProgram, source: string): string {
-  const { identification: id, environment: env, data, procedure } = program
+  const { identification: id, environment: env, data, component, procedure } = program
 
   const css  = generateCss(env)
   const lang = id.language?.toLowerCase() ?? 'en'
 
+  // Build component registry
+  const registry: ComponentRegistry = new Map(
+    component.components.map(def => [def.name, def])
+  )
+
   // Render all sections
   const body = procedure.sections.map(section => {
-    return section.statements.map(stmt => renderStatement(stmt, data)).join('\n')
+    return section.statements.map(stmt => renderStatementWithRegistry(stmt, data, registry)).join('\n')
   }).join('\n')
 
   // Source embedding — the core RECALL principle
