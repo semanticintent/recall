@@ -47,6 +47,11 @@ DATA DIVISION.
             10 PROJ-DESC   PIC X(200) VALUE "Every .rcl file is a semantic intent document. An AI can read, modify, generate, and audit RECALL source without a schema — because the intent is in the syntax, not hidden behind it.".
             10 PROJ-TAG    PIC X(20)  VALUE "BY DESIGN".
             10 PROJ-HREF   PIC X(80)  VALUE "#".
+         05 WHY-3.
+            10 PROJ-TITLE  PIC X(60)  VALUE "BUILT FOR THE AI COLLABORATION LOOP.".
+            10 PROJ-DESC   PIC X(200) VALUE "HTML has no grammar. An AI generating HTML can do anything — including things you did not ask for. RECALL's constrained syntax makes AI output predictable, round-trippable, and auditable. Ask for a page. Get back valid .rcl. Compile. Done.".
+            10 PROJ-TAG    PIC X(20)  VALUE "THE LOOP".
+            10 PROJ-HREF   PIC X(80)  VALUE "#".
 
       01 PRINCIPLE-ITEMS.
          05 PRINCIPLE-1.
@@ -101,7 +106,7 @@ PROCEDURE DIVISION.
             WITH STYLE MONO.
          DISPLAY CARD-LIST USING WHY-COBOL-ITEMS
             WITH STYLE BORDERED
-            WITH COLUMNS 2
+            WITH COLUMNS 3
             WITH HOVER-LIFT YES.
       STOP SECTION.
 
