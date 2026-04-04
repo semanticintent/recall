@@ -87,34 +87,51 @@ nav.sticky { position: sticky; top: 0; z-index: 100; background: var(--bg); }
 .nav-logo { font-weight: 600; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--text); cursor: pointer; transition: color 0.15s; }
 .nav-logo:hover { color: var(--accent); opacity: 1; }
 .nav-links { display: flex; gap: 32px; }
-.nav-links a { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
-.nav-links a:hover { color: var(--text); }
+.nav-links a { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--text); opacity: 0.6; transition: color 0.15s, opacity 0.15s; }
+.nav-links a:hover { color: var(--accent); opacity: 1; }
 section { padding: 80px 0; }
 section.padding-small  { padding: 40px 0; }
 section.padding-medium { padding: 60px 0; }
-section.padding-large  { padding: 100px 0; }
+section.padding-large  { padding: 120px 0; }
+section.style-grid-bg { background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px); background-size: 48px 48px; }
 .layout-centered { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
 .layout-grid { display: grid; gap: 24px; }
 .layout-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .layout-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .layout-flex { display: flex; gap: 24px; flex-wrap: wrap; }
-.layout-stack { display: flex; flex-direction: column; gap: 20px; }
-h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 600; line-height: 1.1; margin-bottom: 20px; }
-h2 { font-size: clamp(22px, 3vw, 36px); font-weight: 600; line-height: 1.2; margin-bottom: 16px; }
+.layout-stack { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; }
+h1 { font-size: clamp(26px, 3vw, 40px); font-weight: 600; line-height: 1.1; margin-bottom: 24px; }
+h2 { font-size: clamp(22px, 2.5vw, 34px); font-weight: 600; line-height: 1.15; margin-bottom: 16px; }
 h3 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
 h1.style-mono, h2.style-mono, h3.style-mono { font-family: var(--font-mono); }
 h1.style-sans, h2.style-sans, h3.style-sans { font-family: var(--font-sans); }
-p { font-family: var(--font-sans); color: var(--muted); max-width: 680px; margin-bottom: 16px; line-height: 1.8; }
+p { font-family: var(--font-sans); color: var(--muted); max-width: 680px; margin-bottom: 16px; line-height: 1.8; font-size: 18px; }
+.layout-centered p { font-size: 20px; line-height: 1.75; }
 p.color-text  { color: var(--text); }
 p.color-accent { color: var(--accent); }
 p code { font-family: var(--font-mono); font-size: 0.85em; color: var(--accent); background: rgba(0,255,65,0.07); padding: 1px 6px; border: 1px solid rgba(0,255,65,0.15); }
-.recall-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); margin-bottom: 8px; }
+.recall-label { display: inline-block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); font-family: var(--font-mono); margin-bottom: 16px; background: rgba(0,255,65,0.07); padding: 4px 10px; }
 .recall-btn { display: inline-block; padding: 12px 28px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border: none; transition: opacity 0.2s; }
 .recall-btn.primary  { background: var(--accent); color: var(--bg); }
 .recall-btn.ghost    { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .recall-btn.outline  { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
 .recall-btn:hover { opacity: 0.85; }
-pre.code-block { font-family: var(--font-mono); font-size: 13px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); padding: 24px; overflow-x: auto; line-height: 1.6; color: var(--accent); margin: 16px 0; }
+.code-block-wrap { margin: 16px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.code-block-header { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--border); padding: 9px 16px; }
+.code-block-lang { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); opacity: 0.7; }
+.code-block-dots { display: flex; gap: 6px; align-items: center; }
+.code-block-dots span { width: 10px; height: 10px; border-radius: 50%; }
+.code-block-dots span:nth-child(1) { background: #ff5f57; }
+.code-block-dots span:nth-child(2) { background: #febc2e; }
+.code-block-dots span:nth-child(3) { background: #28c840; }
+pre.code-block { font-family: var(--font-mono); font-size: 13px; background: #0e0e0e; padding: 20px 24px; overflow-x: auto; line-height: 1.75; color: #c9d1d9; margin: 0; white-space: pre; }
+.tok-kw   { color: #7ee787; }
+.tok-stmt { color: var(--accent); }
+.tok-with { color: #d2a8ff; }
+.tok-str  { color: #f0b060; }
+.tok-num  { color: #79b8ff; }
+.tok-field { color: #79b8ff; }
 .card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 28px 24px; }
 .card.hover-lift { transition: transform 0.2s, border-color 0.2s; }
 .card.hover-lift:hover { transform: translateY(-3px); border-color: var(--accent); }
@@ -136,6 +153,8 @@ footer p { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; colo
 footer.align-center { text-align: center; }
 footer.align-right  { text-align: right; }
 .layout-sidebar { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; align-items: start; }
+.layout-split { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+.split-col { display: flex; flex-direction: column; gap: 20px; }
 .sidebar-rail { border-right: 1px solid var(--border); padding: 32px 0; }
 .sidebar-rail.sticky { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 .sidebar-logo { padding: 0 24px 24px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); margin-bottom: 24px; display: block; }
@@ -164,9 +183,10 @@ footer.align-right  { text-align: right; }
 .recall-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 .recall-tab-panel { display: none; padding: 0; }
 .recall-tab-panel.active { display: block; }
-.recall-tab-panel pre.code-block { border: none; margin: 0; }
+.recall-tab-panel .code-block-wrap { border: none; border-radius: 0; margin: 0; }
 @media (max-width: 768px) {
   .layout-grid.cols-2, .layout-grid.cols-3 { grid-template-columns: 1fr; }
+  .layout-split { grid-template-columns: 1fr; }
   .nav-links { gap: 16px; }
   .layout-sidebar { grid-template-columns: 1fr; }
   .sidebar-rail { display: none; }
@@ -289,20 +309,37 @@ function renderSidebarNav(stmt: DisplayStatement, data: DataDivision): string {
 </aside>`
 }
 
+function groupButtonRows(children: DisplayStatement[]): Array<DisplayStatement | DisplayStatement[]> {
+  const out: Array<DisplayStatement | DisplayStatement[]> = []
+  let i = 0
+  while (i < children.length) {
+    if (children[i].element === 'BUTTON') {
+      const group: DisplayStatement[] = []
+      while (i < children.length && children[i].element === 'BUTTON') group.push(children[i++])
+      out.push(group.length > 1 ? group : group[0])
+    } else {
+      out.push(children[i++])
+    }
+  }
+  return out
+}
+
 function renderSection(stmt: DisplayStatement, data: DataDivision, registry: ComponentRegistry = new Map()): string {
-  const id      = clause(stmt.clauses, 'ID')
-  const layout  = clause(stmt.clauses, 'LAYOUT', 'STACK').toLowerCase()
-  const padding = clause(stmt.clauses, 'PADDING', 'MEDIUM').toLowerCase()
-  const columns = clause(stmt.clauses, 'COLUMNS', '1')
-  const bg      = clause(stmt.clauses, 'BACKGROUND')
-  const style   = bg ? ` style="background:var(--${bg.replace('COLOR-', '').toLowerCase()})"` : ''
+  const id         = clause(stmt.clauses, 'ID')
+  const layout     = clause(stmt.clauses, 'LAYOUT', 'STACK').toLowerCase()
+  const padding    = clause(stmt.clauses, 'PADDING', 'MEDIUM').toLowerCase()
+  const columns    = clause(stmt.clauses, 'COLUMNS', '1')
+  const styleClause = clause(stmt.clauses, 'STYLE', '').toLowerCase().replace(/[^a-z0-9-]/g, '')
+  const bg         = clause(stmt.clauses, 'BACKGROUND')
+  const inlineStyle = bg ? ` style="background:var(--${bg.replace('COLOR-', '').toLowerCase()})"` : ''
+  const sectionClass = `padding-${padding}${styleClause ? ` style-${styleClause}` : ''}`
 
   if (layout === 'sidebar') {
     const sidebarStmt  = stmt.children.find(c => c.element === 'SIDEBAR-NAV')
     const contentStmts = stmt.children.filter(c => c.element !== 'SIDEBAR-NAV')
     const sidebarHtml  = sidebarStmt ? renderSidebarNav(sidebarStmt, data) : '<aside class="sidebar-rail"></aside>'
     const contentHtml  = contentStmts.map(c => renderStatementWithRegistry(c, data, registry)).join('\n    ')
-    return `<div${id ? ` id="${escapeHtml(id)}"` : ''} class="layout-sidebar"${style}>
+    return `<div${id ? ` id="${escapeHtml(id)}"` : ''} class="layout-sidebar"${inlineStyle}>
   ${sidebarHtml}
   <main class="sidebar-content">
     ${contentHtml}
@@ -310,10 +347,28 @@ function renderSection(stmt: DisplayStatement, data: DataDivision, registry: Com
 </div>`
   }
 
-  const layoutClass = `layout-${layout}${layout === 'grid' ? ` cols-${columns}` : ''}`
-  const inner = stmt.children.map(c => renderStatementWithRegistry(c, data, registry)).join('\n  ')
+  if (layout === 'split') {
+    const sections = stmt.children.filter(c => c.element === 'SECTION')
+    const [left, right] = sections
+    const leftHtml  = left  ? left.children.map(c => renderStatementWithRegistry(c, data, registry)).join('\n      ') : ''
+    const rightHtml = right ? right.children.map(c => renderStatementWithRegistry(c, data, registry)).join('\n      ') : ''
+    return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="${sectionClass}"${inlineStyle}>
+  <div class="container layout-split">
+    <div class="split-col">${leftHtml}</div>
+    <div class="split-col">${rightHtml}</div>
+  </div>
+</section>`
+  }
 
-  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="padding-${padding}"${style}>
+  const layoutClass = `layout-${layout}${layout === 'grid' ? ` cols-${columns}` : ''}`
+  const inner = groupButtonRows(stmt.children).map(item => {
+    if (Array.isArray(item)) {
+      return `<div class="btn-row">${item.map(b => renderStatementWithRegistry(b, data, registry)).join('')}</div>`
+    }
+    return renderStatementWithRegistry(item, data, registry)
+  }).join('\n  ')
+
+  return `<section${id ? ` id="${escapeHtml(id)}"` : ''} class="${sectionClass}"${inlineStyle}>
   <div class="container ${layoutClass}">
   ${inner}
   </div>
@@ -431,10 +486,45 @@ function renderBanner(stmt: DisplayStatement, data: DataDivision): string {
   return `<div class="recall-banner">${text}</div>`
 }
 
+function syntaxHighlight(escaped: string): string {
+  let s = escaped
+  // String literals: &quot;...&quot;
+  s = s.replace(/(&quot;)((?:[^&]|&(?!quot;))*?)(&quot;)/g, '<span class="tok-str">$1$2$3</span>')
+  // Division headers
+  s = s.replace(/\b(IDENTIFICATION|ENVIRONMENT|DATA|PROCEDURE|COMPONENT) (DIVISION)\b/g,
+    '<span class="tok-kw">$1 $2</span>')
+  // Section headers
+  s = s.replace(/\b(WORKING-STORAGE|ITEMS|PALETTE|FONT|CONFIGURATION) (SECTION)\b/g,
+    '<span class="tok-kw">$1 $2</span>')
+  // STOP RUN / STOP SECTION before generic STOP
+  s = s.replace(/\bSTOP (RUN|SECTION)\b/g, '<span class="tok-stmt">STOP $1</span>')
+  // Display verbs
+  s = s.replace(/\b(DISPLAY|COPY|PERFORM|MOVE|COMPUTE)\b/g, '<span class="tok-stmt">$1</span>')
+  // Clause keywords
+  s = s.replace(/\b(WITH|ON-CLICK|USING|FROM|PIC|VALUE)\b/g, '<span class="tok-with">$1</span>')
+  // Identification fields
+  s = s.replace(/\b(PROGRAM-ID|PAGE-TITLE|AUTHOR|DATE-WRITTEN|DESCRIPTION|FAVICON|VIEWPORT|COLOR-MODE|LANGUAGE|FONT-PRIMARY|FONT-SECONDARY)\b/g,
+    '<span class="tok-field">$1</span>')
+  // Level numbers at line start
+  s = s.replace(/(^|\n)( *)(01|05|10)(\s)/g, '$1$2<span class="tok-num">$3</span>$4')
+  return s
+}
+
 function renderCodeBlock(stmt: DisplayStatement, data: DataDivision): string {
-  const text = escapeHtml(resolveValue(stmt.value, data).replace(/\\n/g, '\n'))
+  const raw = resolveValue(stmt.value, data)
+    .replace(/\\n/g, '\n')
+    .replace(/\\"/g, '"')
   const lang = clause(stmt.clauses, 'LANGUAGE', '')
-  return `<pre class="code-block"${lang ? ` data-language="${lang}"` : ''}>${text}</pre>`
+  const isRecall = !lang || ['recall', 'rcl', 'cobol', 'cbl'].includes(lang.toLowerCase())
+  const highlighted = isRecall ? syntaxHighlight(escapeHtml(raw)) : escapeHtml(raw)
+  const langLabel = lang || 'RECALL'
+  return `<div class="code-block-wrap">
+  <div class="code-block-header">
+    <div class="code-block-dots"><span></span><span></span><span></span></div>
+    <span class="code-block-lang">${escapeHtml(langLabel)}</span>
+  </div>
+  <pre class="code-block">${highlighted}</pre>
+</div>`
 }
 
 function renderLabel(stmt: DisplayStatement, data: DataDivision): string {
@@ -505,11 +595,14 @@ function renderTabs(stmt: DisplayStatement, data: DataDivision): string {
     `<button class="recall-tab-btn${i === 0 ? ' active' : ''}" data-tab="${i}">${escapeHtml(t.label)}</button>`
   ).join('\n    ')
 
-  const panels = tabs.map((t, i) =>
-    `<div class="recall-tab-panel${i === 0 ? ' active' : ''}" data-panel="${i}">
-    <pre class="code-block"${t.lang ? ` data-language="${t.lang}"` : ''}>${escapeHtml(t.content)}</pre>
+  const panels = tabs.map((t, i) => {
+    const raw = t.content.replace(/\\n/g, '\n').replace(/\\"/g, '"')
+    const isRecall = !t.lang || ['recall', 'rcl', 'cobol', 'cbl'].includes(t.lang.toLowerCase())
+    const highlighted = isRecall ? syntaxHighlight(escapeHtml(raw)) : escapeHtml(raw)
+    return `<div class="recall-tab-panel${i === 0 ? ' active' : ''}" data-panel="${i}">
+    <pre class="code-block">${highlighted}</pre>
   </div>`
-  ).join('\n  ')
+  }).join('\n  ')
 
   return `<div class="recall-tabs">
   <div class="recall-tabs-header">
