@@ -140,7 +140,7 @@ footer.align-right  { text-align: right; }
 .sidebar-logo { padding: 0 24px 24px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); margin-bottom: 24px; display: block; }
 .sidebar-group { margin-bottom: 28px; padding: 0 24px; }
 .sidebar-group-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: block; }
-.sidebar-link { display: block; font-size: 13px; color: var(--muted); padding: 5px 0; transition: color 0.15s; font-family: var(--font-mono); }
+.sidebar-link { display: block; font-size: 13px; color: var(--text); opacity: 0.65; padding: 5px 0; transition: color 0.15s, opacity 0.15s; font-family: var(--font-mono); }
 .sidebar-link:hover { color: var(--accent); opacity: 1; }
 .sidebar-content { padding: 48px; min-width: 0; }
 .recall-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
