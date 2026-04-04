@@ -142,6 +142,27 @@ footer.align-right  { text-align: right; }
 .sidebar-link { display: block; font-size: 13px; color: var(--muted); padding: 5px 0; transition: color 0.15s; font-family: var(--font-mono); }
 .sidebar-link:hover { color: var(--accent); opacity: 1; }
 .sidebar-content { padding: 48px; min-width: 0; }
+.recall-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+.recall-table th { background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 10px 14px; text-align: left; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+.recall-table td { border: 1px solid var(--border); padding: 10px 14px; font-family: var(--font-mono); font-size: 13px; color: var(--text); vertical-align: top; line-height: 1.6; }
+.recall-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+.recall-callout { padding: 14px 18px; border-left: 3px solid var(--accent); background: rgba(255,255,255,0.03); margin: 20px 0; }
+.recall-callout.type-tip     { border-left-color: #4ade80; }
+.recall-callout.type-warning { border-left-color: #facc15; }
+.recall-callout.type-danger  { border-left-color: #f87171; }
+.recall-callout-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; font-family: var(--font-mono); margin-bottom: 6px; color: var(--accent); }
+.recall-callout.type-tip     .recall-callout-label { color: #4ade80; }
+.recall-callout.type-warning .recall-callout-label { color: #facc15; }
+.recall-callout.type-danger  .recall-callout-label { color: #f87171; }
+.recall-callout p { margin: 0; color: var(--text); max-width: 100%; font-size: 14px; }
+.recall-tabs { margin: 24px 0; border: 1px solid var(--border); }
+.recall-tabs-header { display: flex; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+.recall-tab-btn { padding: 10px 20px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--muted); cursor: pointer; transition: color 0.15s; }
+.recall-tab-btn:hover { color: var(--text); }
+.recall-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.recall-tab-panel { display: none; padding: 0; }
+.recall-tab-panel.active { display: block; }
+.recall-tab-panel pre.code-block { border: none; margin: 0; }
 @media (max-width: 768px) {
   .layout-grid.cols-2, .layout-grid.cols-3 { grid-template-columns: 1fr; }
   .nav-links { gap: 16px; }
@@ -420,6 +441,75 @@ function renderImage(stmt: DisplayStatement, data: DataDivision): string {
   return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" style="width:${widthMap[size] ?? '100%'}" />`
 }
 
+function renderTable(stmt: DisplayStatement, data: DataDivision): string {
+  const groupName  = clause(stmt.clauses, 'USING')
+  const headersRaw = clause(stmt.clauses, 'HEADERS', '')
+  const headers    = headersRaw ? headersRaw.split(',').map(h => h.trim()) : []
+  const group      = resolveGroup(groupName, data)
+  if (!group) return `<!-- TABLE: group ${groupName} not found -->`
+
+  const headerRow = headers.length > 0
+    ? `<thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>`
+    : ''
+
+  const rows = group.children.map(row =>
+    `<tr>${row.children.map(cell => `<td>${escapeHtml(cell.value)}</td>`).join('')}</tr>`
+  ).join('\n    ')
+
+  return `<table class="recall-table">
+  ${headerRow}
+  <tbody>
+    ${rows}
+  </tbody>
+</table>`
+}
+
+function renderCallout(stmt: DisplayStatement, data: DataDivision): string {
+  const text  = escapeHtml(resolveValue(stmt.value, data))
+  const type  = clause(stmt.clauses, 'TYPE', 'NOTE').toLowerCase()
+  const label = type.toUpperCase()
+  return `<div class="recall-callout type-${type}">
+  <div class="recall-callout-label">${label}</div>
+  <p>${text}</p>
+</div>`
+}
+
+function renderTabs(stmt: DisplayStatement, data: DataDivision): string {
+  const groupName = clause(stmt.clauses, 'USING')
+  const group     = resolveGroup(groupName, data)
+  if (!group) return `<!-- TABS: group ${groupName} not found -->`
+
+  const tabs = group.children.map(tab => {
+    const fields: Record<string, string> = {}
+    tab.children.forEach(f => {
+      const key = f.name.replace(/^[^-]+-/, '')
+      fields[key] = f.value
+    })
+    return {
+      label:   fields['LABEL']   ?? tab.name,
+      content: fields['CONTENT'] ?? '',
+      lang:    fields['LANG']    ?? '',
+    }
+  })
+
+  const buttons = tabs.map((t, i) =>
+    `<button class="recall-tab-btn${i === 0 ? ' active' : ''}" data-tab="${i}">${escapeHtml(t.label)}</button>`
+  ).join('\n    ')
+
+  const panels = tabs.map((t, i) =>
+    `<div class="recall-tab-panel${i === 0 ? ' active' : ''}" data-panel="${i}">
+    <pre class="code-block"${t.lang ? ` data-language="${t.lang}"` : ''}>${escapeHtml(t.content)}</pre>
+  </div>`
+  ).join('\n  ')
+
+  return `<div class="recall-tabs">
+  <div class="recall-tabs-header">
+    ${buttons}
+  </div>
+  ${panels}
+</div>`
+}
+
 // ─────────────────────────────────────────────────────────
 // Main statement dispatcher
 // ─────────────────────────────────────────────────────────
@@ -446,6 +536,9 @@ function renderStatementWithRegistry(
     case 'DIVIDER':     return renderDivider(stmt)
     case 'BANNER':      return renderBanner(stmt, data)
     case 'IMAGE':       return renderImage(stmt, data)
+    case 'TABLE':       return renderTable(stmt, data)
+    case 'CALLOUT':     return renderCallout(stmt, data)
+    case 'TABS':        return renderTabs(stmt, data)
     case 'LINK': {
       const text = escapeHtml(resolveValue(stmt.value, data))
       const href = clause(stmt.clauses, 'HREF', '#')
@@ -484,6 +577,8 @@ export function generate(program: ReclProgram, source: string): string {
     return section.statements.map(stmt => renderStatementWithRegistry(stmt, data, registry)).join('\n')
   }).join('\n')
 
+  const hasTabs = body.includes('recall-tabs')
+
   // Source embedding — the core RECALL principle
   const sourceComment = `<!--
 ${'*'.repeat(54)}
@@ -501,6 +596,21 @@ ${'*'.repeat(54)}
     ? `<meta name="viewport" content="width=1200">`
     : `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
 
+  const tabsScript = hasTabs ? `<script>
+document.querySelectorAll('.recall-tabs').forEach(function(tabs) {
+  var btns = tabs.querySelectorAll('.recall-tab-btn');
+  var panels = tabs.querySelectorAll('.recall-tab-panel');
+  btns.forEach(function(btn, i) {
+    btn.addEventListener('click', function() {
+      btns.forEach(function(b) { b.classList.remove('active'); });
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      panels[i].classList.add('active');
+    });
+  });
+});
+</script>` : ''
+
   return `${sourceComment}
 <!DOCTYPE html>
 <html lang="${lang}">
@@ -517,6 +627,6 @@ ${css}
 </head>
 <body id="${id.programId.toLowerCase()}">
 ${body}
-</body>
+${tabsScript}</body>
 </html>`
 }

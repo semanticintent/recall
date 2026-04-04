@@ -19,6 +19,38 @@ DATA DIVISION.
       01 BUILD-CMD   PIC X(40)  VALUE "recall build src/ --out public/".
 
    ITEMS SECTION.
+      01 ELEMENT-REF.
+         05 ROW-1.
+            10 COL-NAME PIC X(20) VALUE "HEADING-1".
+            10 COL-TYPE PIC X(20) VALUE "DISPLAY".
+            10 COL-DESC PIC X(80) VALUE "Renders an h1 heading. Supports WITH STYLE MONO.".
+         05 ROW-2.
+            10 COL-NAME PIC X(20) VALUE "PARAGRAPH".
+            10 COL-TYPE PIC X(20) VALUE "DISPLAY".
+            10 COL-DESC PIC X(80) VALUE "Renders a paragraph. Supports WITH COLOR MUTED.".
+         05 ROW-3.
+            10 COL-NAME PIC X(20) VALUE "TABLE".
+            10 COL-TYPE PIC X(20) VALUE "DISPLAY".
+            10 COL-DESC PIC X(80) VALUE "Renders a bordered reference table from ITEMS data.".
+         05 ROW-4.
+            10 COL-NAME PIC X(20) VALUE "CALLOUT".
+            10 COL-TYPE PIC X(20) VALUE "DISPLAY".
+            10 COL-DESC PIC X(80) VALUE "Renders a NOTE, TIP, WARNING or DANGER callout block.".
+         05 ROW-5.
+            10 COL-NAME PIC X(20) VALUE "TABS".
+            10 COL-TYPE PIC X(20) VALUE "DISPLAY".
+            10 COL-DESC PIC X(80) VALUE "Renders an interactive tabbed code block from ITEMS data.".
+
+      01 SYNTAX-TABS.
+         05 TAB-1.
+            10 TAB-LABEL   PIC X(20) VALUE "RECALL".
+            10 TAB-CONTENT PIC X(200) VALUE "DISPLAY CALLOUT WITH TYPE NOTE.".
+            10 TAB-LANG    PIC X(20) VALUE "cobol".
+         05 TAB-2.
+            10 TAB-LABEL   PIC X(20) VALUE "HTML OUTPUT".
+            10 TAB-CONTENT PIC X(200) VALUE "<div class=recall-callout type-note>...</div>".
+            10 TAB-LANG    PIC X(20) VALUE "html".
+
       01 DOC-NAV.
          05 NAV-SECTION-1.
             10 GROUP-LABEL      PIC X(30) VALUE "GETTING STARTED".
@@ -75,12 +107,28 @@ PROCEDURE DIVISION.
          DISPLAY HEADING-2 "Install the CLI".
          DISPLAY CODE-BLOCK INSTALL-CMD
             WITH LANGUAGE "bash".
+         DISPLAY CALLOUT "Requires Node.js 18 or later."
+            WITH TYPE NOTE.
          DISPLAY HEADING-2 "Compile a file".
          DISPLAY CODE-BLOCK COMPILE-CMD
             WITH LANGUAGE "bash".
          DISPLAY HEADING-2 "Build a site".
          DISPLAY CODE-BLOCK BUILD-CMD
             WITH LANGUAGE "bash".
+         DISPLAY CALLOUT "recall build only compiles .rcl files. Copybooks (.rcpy) are skipped automatically."
+            WITH TYPE TIP.
+      STOP SECTION.
+
+   RENDER-ELEMENTS.
+      DISPLAY SECTION ID "elements"
+         WITH LAYOUT STACK
+         WITH PADDING MEDIUM.
+         DISPLAY LABEL "LANGUAGE REFERENCE".
+         DISPLAY HEADING-2 "Element reference".
+         DISPLAY TABLE USING ELEMENT-REF
+            WITH HEADERS "ELEMENT, TYPE, DESCRIPTION".
+         DISPLAY HEADING-2 "Syntax example".
+         DISPLAY TABS USING SYNTAX-TABS.
       STOP SECTION.
 
    STOP RUN.
