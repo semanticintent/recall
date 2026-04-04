@@ -90,12 +90,13 @@ recall check my-site.rcl
 
 ## Language Structure
 
-Every RECALL program has four divisions:
+Every RECALL program has five divisions:
 
 ```cobol
 IDENTIFICATION DIVISION.   ← who this is
 ENVIRONMENT DIVISION.      ← how it looks (theme, fonts, palette)
 DATA DIVISION.             ← what it holds (variables, lists)
+COMPONENT DIVISION.        ← custom elements defined in RECALL syntax
 PROCEDURE DIVISION.        ← what it renders
 ```
 
@@ -193,6 +194,64 @@ PROCEDURE DIVISION.
 
 ---
 
+## COMPONENT DIVISION
+
+Define custom elements in RECALL syntax. Use them exactly like built-in
+elements. Pure compile-time expansion — the output is still zero-dependency HTML.
+
+```cobol
+COMPONENT DIVISION.
+
+   DEFINE PRICING-CARD.
+      ACCEPTS TIER, PRICE, FEATURES, CTA-LABEL, CTA-HREF.
+      DISPLAY SECTION
+         WITH LAYOUT STACK.
+         DISPLAY HEADING-3 TIER.
+         DISPLAY LABEL PRICE.
+         DISPLAY CARD-LIST USING FEATURES.
+         DISPLAY BUTTON CTA-LABEL
+            ON-CLICK GOTO CTA-HREF
+            WITH STYLE PRIMARY.
+      STOP SECTION.
+   END DEFINE.
+```
+
+Call it from PROCEDURE DIVISION with `WITH` clauses binding each `ACCEPTS` parameter:
+
+```cobol
+RENDER-PRICING.
+   DISPLAY SECTION ID "pricing"
+      WITH LAYOUT GRID
+      WITH COLUMNS 2.
+      DISPLAY PRICING-CARD
+         WITH TIER "STARTER"
+         WITH PRICE "$0 / month"
+         WITH FEATURES STARTER-FEATURES
+         WITH CTA-LABEL "GET STARTED"
+         WITH CTA-HREF "/signup".
+      DISPLAY PRICING-CARD
+         WITH TIER "PRO"
+         WITH PRICE "$29 / month"
+         WITH FEATURES PRO-FEATURES
+         WITH CTA-LABEL "GO PRO"
+         WITH CTA-HREF "/signup/pro".
+   STOP SECTION.
+```
+
+Component libraries live in their own `.rcl` files and are loaded via `COPY FROM`:
+
+```cobol
+PROCEDURE DIVISION.
+
+   LOAD-COMPONENTS.
+      COPY FROM "components/pricing-card.rcl".
+```
+
+The compiler merges the component definitions into the registry and inlines
+zero HTML at the LOAD position — it's a named import, not a render call.
+
+---
+
 ## Components (COPY)
 
 Reuse elements across pages with `COPY FROM`:
@@ -243,15 +302,18 @@ See [`examples/`](examples/) for working `.rcl` files:
 
 - [`examples/portfolio.rcl`](examples/portfolio.rcl) — personal portfolio page
 - [`examples/landing.rcl`](examples/landing.rcl) — RECALL's own landing page (written in RECALL)
-- [`examples/components/nav.rcl`](examples/components/nav.rcl) — reusable nav component
+- [`examples/pricing.rcl`](examples/pricing.rcl) — two PRICING-CARD instances from one component definition
+- [`examples/components/nav.rcl`](examples/components/nav.rcl) — reusable nav component (COPY)
+- [`examples/components/pricing-card.rcl`](examples/components/pricing-card.rcl) — PRICING-CARD + TESTIMONIAL (COMPONENT DIVISION)
 
 ---
 
 ## Roadmap
 
-- [x] Four-division language structure
+- [x] Five-division language structure
 - [x] Full element library (16 elements)
-- [x] COPY — component-based composability
+- [x] COPY — shared components, data, and procedure sections
+- [x] COMPONENT DIVISION — custom elements with ACCEPTS parameters
 - [ ] Multi-page `recall build` with project manifest
 - [ ] Shared theme inheritance (`COPY PALETTE FROM "theme.rcl"`)
 - [ ] Opt-in vanilla JS interactions (tabs, accordion, modal)
@@ -267,7 +329,7 @@ Pull requests welcome. Please open an issue first for significant changes.
 git clone https://github.com/semanticintent/recall
 cd recall
 npm install
-npm test         # 37 tests
+npm test         # 46 tests
 npm run build    # compile TypeScript
 node bin/recall.js compile examples/landing.rcl
 ```
