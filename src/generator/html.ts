@@ -106,6 +106,7 @@ h1.style-sans, h2.style-sans, h3.style-sans { font-family: var(--font-sans); }
 p { font-family: var(--font-sans); color: var(--muted); max-width: 680px; margin-bottom: 16px; line-height: 1.8; }
 p.color-text  { color: var(--text); }
 p.color-accent { color: var(--accent); }
+p code { font-family: var(--font-mono); font-size: 0.85em; color: var(--accent); background: rgba(0,255,65,0.07); padding: 1px 6px; border: 1px solid rgba(0,255,65,0.15); }
 .recall-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); margin-bottom: 8px; }
 .recall-btn { display: inline-block; padding: 12px 28px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border: none; transition: opacity 0.2s; }
 .recall-btn.primary  { background: var(--accent); color: var(--bg); }
@@ -335,8 +336,15 @@ function renderHeading(stmt: DisplayStatement, data: DataDivision, level: 1 | 2 
   return `<h${level}${classes ? ` class="${classes}"` : ''}>${text}</h${level}>`
 }
 
+function inlineCode(raw: string): string {
+  return raw
+    .split(/`([^`]+)`/)
+    .map((part, i) => i % 2 === 0 ? escapeHtml(part) : `<code>${escapeHtml(part)}</code>`)
+    .join('')
+}
+
 function renderParagraph(stmt: DisplayStatement, data: DataDivision): string {
-  const text  = escapeHtml(resolveValue(stmt.value, data))
+  const text  = inlineCode(resolveValue(stmt.value, data))
   const color = clause(stmt.clauses, 'COLOR', '').replace('COLOR-', '').toLowerCase()
   return `<p${color ? ` class="color-${color}"` : ''}>${text}</p>`
 }
