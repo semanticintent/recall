@@ -4,6 +4,50 @@
 
 ---
 
+## 0. Design Law: COBOL First
+
+**Every feature in RECALL must have a COBOL precedent.**
+
+Before adding any new language feature, keyword, convention, or file behaviour, ask:
+
+> *"How did COBOL solve this?"*
+
+If COBOL solved it, RECALL adopts the same solution — adapted for the web, but faithful to the original intent. If COBOL didn't solve it, the feature needs extraordinary justification to exist.
+
+This is not nostalgia. It is a constraint that keeps the language coherent, legible, and durable. COBOL's design decisions survived 60 years of production use. That is the standard RECALL holds itself to.
+
+### Why this rule exists
+
+RECALL was designed in two days. Speed creates the temptation to reach for familiar modern conventions when a problem arises. That temptation must be resisted. Every time we asked "what would COBOL do?", the answer was better than what we were about to invent.
+
+### A concrete example: partial file exclusion
+
+Early in development, the question arose: *how do we exclude partial/component files from the build compiler so only full pages are compiled?*
+
+The first instinct was a modern convention: prefix component files with an underscore (`_nav.rcl`, `_footer.rcl`) — borrowed from Sass/Jekyll. It would have worked.
+
+But we asked: *how did COBOL solve this?*
+
+COBOL solved it with **copybooks** — separate files with a `.cpy` extension that are never compiled standalone, only `COPY`'d into a program at compile time. The extension itself signals intent. No naming convention needed. The file type *is* the contract.
+
+RECALL adopted this exactly: `.rcpy` files (copybooks) are never compiled by `recall build`. They are only valid as targets of `COPY FROM`. The underscore convention was abandoned.
+
+**That is the right call. Make it every time.**
+
+### Checklist for new features
+
+Before implementing, answer each question:
+
+- [ ] Does COBOL have this concept? What is it called?
+- [ ] Can the COBOL keyword or convention be used directly?
+- [ ] If adapted, does the adaptation preserve the original intent?
+- [ ] Does the feature add a new mental model, or extend an existing COBOL one?
+- [ ] Would a COBOL developer recognise this immediately?
+
+If the answers push toward "no" repeatedly, reconsider the feature.
+
+---
+
 ## 1. What Is RECALL?
 
 RECALL is a declarative web interface language written in COBOL-inspired syntax.
