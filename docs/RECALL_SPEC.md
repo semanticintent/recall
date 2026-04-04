@@ -4,7 +4,7 @@
 
 ---
 
-## 1. What Is COBWEB?
+## 1. What Is RECALL?
 
 RECALL is a declarative web interface language written in COBOL-inspired syntax.
 It transpiles to self-contained, dependency-free HTML/CSS/JS files.
@@ -31,7 +31,7 @@ RECALL is:
 ## 2. File Format
 
 ```
-filename.rcl         — COBWEB source file
+filename.rcl         — RECALL source file
 filename.html        — compiled output (self-contained)
 ```
 
@@ -144,10 +144,10 @@ DATA DIVISION.
 
       01 PROJECT-ITEMS.
          05 PROJECT-1.
-            10 PROJ-TITLE  PIC X(60)  VALUE "COBWEB TRANSPILER".
+            10 PROJ-TITLE  PIC X(60)  VALUE "RECALL TRANSPILER".
             10 PROJ-DESC   PIC X(200) VALUE "A COBOL-syntax web interface language.".
             10 PROJ-TAG    PIC X(20)  VALUE "OPEN SOURCE".
-            10 PROJ-HREF   PIC X(80)  VALUE "https://github.com/cobweb".
+            10 PROJ-HREF   PIC X(80)  VALUE "https://github.com/recall".
          05 PROJECT-2.
             10 PROJ-TITLE  PIC X(60)  VALUE "LEGACY BRIDGE".
             10 PROJ-DESC   PIC X(200) VALUE "Connecting mainframe systems to modern UIs.".
@@ -212,7 +212,7 @@ PROCEDURE DIVISION.
 
    RENDER-FOOTER.
       DISPLAY FOOTER
-         WITH TEXT "COMPILED WITH COBWEB. STILL RUNNING."
+         WITH TEXT "COMPILED WITH RECALL. STILL RUNNING."
          WITH ALIGN CENTER.
       STOP SECTION.
 
@@ -223,7 +223,7 @@ PROCEDURE DIVISION.
 
 ## 8. DISPLAY Verb Reference
 
-`DISPLAY` is the primary rendering verb. It maps COBWEB constructs to HTML elements.
+`DISPLAY` is the primary rendering verb. It maps RECALL constructs to HTML elements.
 
 ### Structural Elements
 
@@ -470,5 +470,5 @@ RECALL COMPILATION ERROR
 
 ---
 
-*COBWEB — COBol WEB*
+*RECALL — COBol WEB*
 *Still here. Still running.*

@@ -1,0 +1,19 @@
+# Development
+tests/
+*.test.ts
+vitest.config.ts
+
+# Source (ship dist/ only)
+src/
+
+# Examples and public site
+examples/
+public/
+
+# Docs (available on GitHub)
+docs/
+
+# Misc
+.git/
+.gitignore
+node_modules/
