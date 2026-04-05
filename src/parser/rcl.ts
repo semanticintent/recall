@@ -465,6 +465,8 @@ function parseComponentDivision(lines: string[]): ComponentDivision {
       let currentSection: DisplayStatement = body
       i++
 
+      const sectionStack: DisplayStatement[] = []
+
       while (i < joined.length && joined[i] !== 'END DEFINE.') {
         const inner = joined[i]
 
@@ -475,17 +477,23 @@ function parseComponentDivision(lines: string[]): ComponentDivision {
           const tokens = inner.replace(/\.$/, '').split(/\s+/)
           const stmt = parseDisplayStatement(tokens)
           if (stmt.element === 'SECTION') {
-            // Replace the body wrapper with this explicit SECTION
-            body.element = 'SECTION'
-            body.clauses = stmt.clauses
-            body.value   = stmt.value
-            currentSection = body
+            if (currentSection === body && body.clauses.length === 0 && body.children.length === 0) {
+              // First SECTION in the DEFINE block — promote it to be the body
+              body.element = 'SECTION'
+              body.clauses = stmt.clauses
+              body.value   = stmt.value
+              // currentSection stays as body; don't push to stack
+            } else {
+              // Nested SECTION — add as child and push current onto stack
+              currentSection.children.push(stmt)
+              sectionStack.push(currentSection)
+              currentSection = stmt
+            }
           } else {
             currentSection.children.push(stmt)
           }
         } else if (inner === 'STOP SECTION.') {
-          // back to top-level body if nested
-          currentSection = body
+          currentSection = sectionStack.length > 0 ? sectionStack.pop()! : body
         }
 
         i++

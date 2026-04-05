@@ -4,6 +4,27 @@
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, statSync } from 'node:fs'
 import { resolve, basename, dirname, join, relative, extname } from 'node:path'
+
+// ─────────────────────────────────────────────────────────
+// Path resolution — relative paths and npm package paths
+// ─────────────────────────────────────────────────────────
+
+function resolveFilePath(specifier: string, dir: string): string {
+  // npm scoped package path (@scope/pkg/file.rcpy) — walk up for node_modules
+  if (specifier.startsWith('@')) {
+    let current = dir
+    while (true) {
+      const candidate = join(current, 'node_modules', specifier)
+      if (existsSync(candidate)) return candidate
+      const parent = dirname(current)
+      if (parent === current) break  // filesystem root
+      current = parent
+    }
+    throw new Error(`Cannot resolve package path: "${specifier}" — is the package installed?`)
+  }
+  // Relative or bare path — resolve against dir
+  return resolve(dir, specifier)
+}
 import { parse } from '../parser/rcl.js'
 import { generate } from '../generator/html.js'
 import type { DataDivision, ComponentDivision, DisplayStatement, EnvironmentDivision } from '../parser/rcl.js'
@@ -23,7 +44,7 @@ function resolveStatementsInPlace(
   while (i < statements.length) {
     const stmt = statements[i]
     if (stmt.element === 'COPY') {
-      const filePath = resolve(dir, stmt.value!)
+      const filePath = resolveFilePath(stmt.value!, dir)
       const componentSource = readFileSync(filePath, 'utf-8')
       const imported = parse(componentSource)
       // Merge data
@@ -87,6 +108,48 @@ function extractEnvContent(source: string): string[] {
   return result
 }
 
+function extractComponentContent(source: string): string[] {
+  const lines = source.split('\n')
+  const result: string[] = []
+  let inComponent = false
+  for (const line of lines) {
+    const t = line.trim()
+    if (t.startsWith('COMPONENT DIVISION')) { inComponent = true; continue }
+    if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('COMPONENT DIVISION'))) {
+      inComponent = false; continue
+    }
+    if (inComponent) result.push(line)
+  }
+  return result
+}
+
+function resolveComponentCopies(source: string, dir: string): string {
+  const lines = source.split('\n')
+  const result: string[] = []
+  let inComponent = false
+
+  for (const line of lines) {
+    const t = line.trim()
+    if (t.startsWith('COMPONENT DIVISION')) { inComponent = true; result.push(line); continue }
+    if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('COMPONENT DIVISION'))) {
+      inComponent = false; result.push(line); continue
+    }
+
+    if (inComponent && t.startsWith('COPY FROM')) {
+      const match = t.match(/COPY FROM\s+"([^"]+)"/)
+      if (match) {
+        const filePath = resolveFilePath(match[1], dir)
+        const copySource = readFileSync(filePath, 'utf-8')
+        result.push(...extractComponentContent(copySource))
+      }
+    } else {
+      result.push(line)
+    }
+  }
+
+  return result.join('\n')
+}
+
 function resolveThemeCopies(source: string, dir: string): string {
   const lines = source.split('\n')
   const result: string[] = []
@@ -102,7 +165,7 @@ function resolveThemeCopies(source: string, dir: string): string {
     if (inEnv && t.startsWith('COPY FROM')) {
       const match = t.match(/COPY FROM\s+"([^"]+)"/)
       if (match) {
-        const filePath = resolve(dir, match[1])
+        const filePath = resolveFilePath(match[1], dir)
         const themeSource = readFileSync(filePath, 'utf-8')
         result.push(...extractEnvContent(themeSource))
       }
@@ -147,8 +210,9 @@ export function compile(inputPath: string, outDir?: string): CompileResult {
 
   let program
   try {
-    const merged = resolveThemeCopies(source, dirname(absInput))
-    program = parse(merged)
+    const withTheme     = resolveThemeCopies(source, dirname(absInput))
+    const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
+    program = parse(withComponents)
     resolveIncludes(program, dirname(absInput))
   } catch (err) {
     return { ok: false, inputPath: absInput, error: `PARSE ERROR: ${(err as Error).message}` }
@@ -271,8 +335,9 @@ export function check(inputPath: string): CheckResult {
   }
 
   try {
-    const merged = resolveThemeCopies(source, dirname(absInput))
-    const program = parse(merged)
+    const withTheme      = resolveThemeCopies(source, dirname(absInput))
+    const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
+    const program = parse(withComponents)
 
     if (!program.identification.programId) {
       errors.push('IDENTIFICATION DIVISION: PROGRAM-ID IS REQUIRED.')

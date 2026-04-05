@@ -1,7 +1,7 @@
 # RECALL Roadmap
 
 > Last updated: April 2026
-> Current version: 0.3.17
+> Current version: 0.6.0
 
 ---
 
@@ -26,7 +26,7 @@ This separation is the invariant. New releases add elements or capabilities — 
 | 0.3.x | Theme layer: PALETTE + FONT + STYLE-BLOCK | ✅ Complete |
 | 0.4.x | Data display: TABLE + STAT-GRID | ✅ Complete |
 | 0.5.x | Component data binding — WITH DATA clause | ✅ Complete |
-| **0.6.x** | **Component library resolution (npm)** | 🔲 Next |
+| **0.6.x** | **Component library resolution (npm)** | ✅ Complete |
 | 1.0.0 | Stable language + first published component library | 🔲 Planned |
 
 ---
@@ -162,19 +162,28 @@ PROCEDURE DIVISION.
 
 ---
 
-## v0.6 — Component Library Resolution
+## v0.6 — Component Library Resolution ✅ Complete
 
 **Goal:** Component `.rcpy` files can be resolved from npm packages, not just relative paths.
 
 **Syntax:**
 ```cobol
-COMPONENT DIVISION.
-   COPY FROM "node_modules/@recall-ui/stratiqx/case-hero.rcpy".
-   COPY FROM "@recall-ui/stratiqx/case-analysis.rcpy".   -- shorthand
+COPY FROM "@semanticintent/recall-ui/components/nav.rcpy".
+COPY FROM "@recall-ui/stratiqx/case-hero.rcpy".
 ```
 
-**What ships:**
-- `@semanticintent/recall-ui` — first published component library
+Works in both ENVIRONMENT DIVISION (theme COPY FROM) and PROCEDURE DIVISION (component COPY FROM).
+
+**Resolution algorithm:**
+- Paths starting with `@` → npm package walk-up: search `node_modules/<specifier>` starting from the source file's directory, walking up to filesystem root
+- All other paths → resolved relative to source file directory (existing behavior, unchanged)
+
+**Error on missing package:** clear message `Cannot resolve package path: "@pkg/..." — is the package installed?` (surfaced as PARSE ERROR in `compile()` result)
+
+**Tests:** 3 new tests in `tests/compiler/copy.test.ts` — procedure COPY, environment theme COPY, missing package error
+
+**What ships next:**
+- `@semanticintent/recall-ui` — first published component library (1.0.0 milestone)
 - Components: navigation patterns, card grids, stat displays, data tables, hero layouts
 
 ---

@@ -76,6 +76,116 @@ function setup() {
   mkdirSync(join(TMP, 'components'), { recursive: true })
 }
 
+const THEME_RCPY = `
+ENVIRONMENT DIVISION.
+   PALETTE SECTION.
+      COLOR-BG    "#111111".
+      COLOR-TEXT  "#eeeeee".
+      COLOR-ACCENT "#00ff41".
+`
+
+const NAV_RCPY = `
+IDENTIFICATION DIVISION.
+   PROGRAM-ID. PKG-NAV.
+
+PROCEDURE DIVISION.
+   COMPONENT.
+      DISPLAY HEADING-2 "Package Nav".
+      STOP SECTION.
+`
+
+describe('npm package path resolution', () => {
+  it('resolves COPY FROM "pkg/component.rcpy" via node_modules walk-up', () => {
+    setup()
+    // Simulate node_modules/@test-ui/components/nav.rcpy installed one level up from file
+    const pkgDir = join(TMP, 'node_modules', '@test-ui', 'components')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(join(pkgDir, 'nav.rcpy'), NAV_RCPY)
+
+    const src = `
+IDENTIFICATION DIVISION.
+   PROGRAM-ID. PKG-TEST.
+   PAGE-TITLE. "Package Test".
+
+ENVIRONMENT DIVISION.
+   CONFIGURATION SECTION.
+      COLOR-MODE DARK.
+
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+
+PROCEDURE DIVISION.
+   RENDER.
+      COPY FROM "@test-ui/components/nav.rcpy".
+   STOP RUN.
+`
+    writeFileSync(join(TMP, 'main.rcl'), src)
+    const result = compile(join(TMP, 'main.rcl'))
+    expect(result.ok).toBe(true)
+    const html = readFileSync(join(TMP, 'main.html'), 'utf-8')
+    expect(html).toContain('Package Nav')
+  })
+
+  it('resolves theme COPY FROM "@pkg/theme.rcpy" in ENVIRONMENT DIVISION', () => {
+    setup()
+    const pkgDir = join(TMP, 'node_modules', '@test-ui', 'themes')
+    mkdirSync(pkgDir, { recursive: true })
+    writeFileSync(join(pkgDir, 'dark.rcpy'), THEME_RCPY)
+
+    const src = `
+IDENTIFICATION DIVISION.
+   PROGRAM-ID. THEME-PKG-TEST.
+   PAGE-TITLE. "Theme Package Test".
+
+ENVIRONMENT DIVISION.
+   CONFIGURATION SECTION.
+      COLOR-MODE DARK.
+   COPY FROM "@test-ui/themes/dark.rcpy".
+
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+      01 HEADING PIC X(20) VALUE "Hello".
+
+PROCEDURE DIVISION.
+   RENDER.
+      DISPLAY HEADING-1 HEADING.
+   STOP RUN.
+`
+    writeFileSync(join(TMP, 'main.rcl'), src)
+    const result = compile(join(TMP, 'main.rcl'))
+    expect(result.ok).toBe(true)
+    const html = readFileSync(join(TMP, 'main.html'), 'utf-8')
+    expect(html).toContain('Hello')
+    // Theme palette applied — background color from pkg
+    expect(html).toContain('#111111')
+  })
+
+  it('throws a clear error when npm package is not installed', () => {
+    setup()
+    const src = `
+IDENTIFICATION DIVISION.
+   PROGRAM-ID. MISSING-PKG.
+   PAGE-TITLE. "Missing Pkg".
+
+ENVIRONMENT DIVISION.
+   CONFIGURATION SECTION.
+      COLOR-MODE DARK.
+
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+
+PROCEDURE DIVISION.
+   RENDER.
+      COPY FROM "@not-installed/components/nav.rcpy".
+   STOP RUN.
+`
+    writeFileSync(join(TMP, 'main.rcl'), src)
+    const result = compile(join(TMP, 'main.rcl'))
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('@not-installed/components/nav.rcpy')
+  })
+})
+
 describe('COPY statement', () => {
   it('inlines component procedure into parent', () => {
     setup()
