@@ -34,10 +34,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/semanticintent/recall.git"
+    "url": "https://github.com/semanticintent/recall-compiler.git"
   },
   "homepage": "https://recall.cormorantforaging.dev",
   "bugs": {
-    "url": "https://github.com/semanticintent/recall/issues"
+    "url": "https://github.com/semanticintent/recall-compiler/issues"
   }
 }
