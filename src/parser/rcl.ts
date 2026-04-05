@@ -524,8 +524,23 @@ export function parse(source: string): ReclProgram {
   }
 
   let currentDivision: Division | null = null
+  let inValueString = false
 
   for (const line of rawLines) {
+    const t = line.trim()
+
+    // Track multi-line VALUE strings — never detect division headers inside them
+    if (inValueString) {
+      if (currentDivision) buckets[currentDivision].push(line)
+      if (t.endsWith('".')) inValueString = false
+      continue
+    }
+    if (t.includes('VALUE "') && !t.endsWith('".')) {
+      inValueString = true
+      if (currentDivision) buckets[currentDivision].push(line)
+      continue
+    }
+
     const div = detectDivision(line)
     if (div) { currentDivision = div; continue }
     if (currentDivision) buckets[currentDivision].push(line)

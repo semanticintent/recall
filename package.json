@@ -1,6 +1,6 @@
 {
   "name": "@semanticintent/recall",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "RECALL — a declarative web interface language with COBOL-inspired syntax. The source is the artifact.",
   "type": "module",
   "main": "./dist/index.js",
