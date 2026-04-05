@@ -327,7 +327,18 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
 
   while (i < tokens.length) {
     const kw = tokens[i]
-    if (kw === 'WITH' && i + 2 < tokens.length) {
+    if (kw === 'WITH' && i + 1 < tokens.length && tokens[i + 1] === 'DATA') {
+      // WITH DATA FIELD1, FIELD2, FIELD3 — collect all field names until next WITH or end
+      const fields: string[] = []
+      let j = i + 2
+      while (j < tokens.length && tokens[j] !== 'WITH') {
+        const name = tokens[j].replace(/,+$/, '').trim()  // strip trailing commas
+        if (name) fields.push(name)
+        j++
+      }
+      if (fields.length > 0) clauses.push({ key: 'DATA', value: fields.join(',') })
+      i = j
+    } else if (kw === 'WITH' && i + 2 < tokens.length) {
       clauses.push({ key: tokens[i + 1], value: extractString(tokens[i + 2]) })
       i += 3
     } else if (kw === 'ID' && i + 1 < tokens.length) {

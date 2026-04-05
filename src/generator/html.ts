@@ -274,10 +274,29 @@ function renderComponent(
   registry: ComponentRegistry,
 ): string {
   const bindings = new Map<string, string>()
+
+  // WITH DATA FIELD1, FIELD2 — bind by name from DATA DIVISION
+  // Scalars (WORKING-STORAGE with a value) → bind resolved string value
+  // Groups (ITEMS with children) → bind name as-is (TABLE/STAT-GRID resolve lazily)
+  const dataClause = stmt.clauses.find(cl => cl.key === 'DATA')
+  if (dataClause) {
+    const fieldNames = dataClause.value.split(',').map(f => f.trim()).filter(Boolean)
+    for (const name of fieldNames) {
+      if (!def.accepts.includes(name)) continue
+      const field = resolveGroup(name, data)
+      if (field) {
+        bindings.set(name, field.children.length > 0 ? name : (field.value || name))
+      }
+    }
+  }
+
+  // WITH PARAM "value" — literal clause bindings (existing; fills any params not bound via DATA)
   for (const param of def.accepts) {
+    if (bindings.has(param)) continue
     const c = stmt.clauses.find(cl => cl.key === param)
     if (c) bindings.set(param, c.value)
   }
+
   const bound = bindParams(def.body, def.accepts, bindings)
   return renderStatementWithRegistry(bound, data, registry)
 }
