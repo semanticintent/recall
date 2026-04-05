@@ -108,6 +108,108 @@ function extractEnvContent(source: string): string[] {
   return result
 }
 
+// ─────────────────────────────────────────────────────────
+// LOAD FROM — JSON/CSV → DATA DIVISION at compile time
+// ─────────────────────────────────────────────────────────
+
+function toRclName(s: string): string {
+  return s.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+function picFor(val: string): string {
+  const isNum = /^\d+(\.\d+)?$/.test(val.trim())
+  return isNum ? `PIC 9(${val.length})` : `PIC X(${Math.max(val.length, 50)})`
+}
+
+function safeValue(val: string): string {
+  return val.replace(/"/g, "'")
+}
+
+function jsonToRclLines(json: Record<string, unknown>): string[] {
+  const ws: string[] = []
+  const items: string[] = []
+
+  for (const [key, val] of Object.entries(json)) {
+    const name = toRclName(key)
+
+    if (Array.isArray(val)) {
+      items.push(`      01 ${name}.`)
+      val.forEach((row, idx) => {
+        if (typeof row !== 'object' || row === null) return
+        const itemName = `${name}-${idx + 1}`
+        items.push(`         05 ${itemName}.`)
+        for (const [fk, fv] of Object.entries(row as Record<string, unknown>)) {
+          const fieldName = `${itemName}-${toRclName(fk)}`
+          const fieldVal  = safeValue(String(fv ?? ''))
+          items.push(`            10 ${fieldName} ${picFor(fieldVal)} VALUE "${fieldVal}".`)
+        }
+      })
+    } else if (typeof val === 'string' || typeof val === 'number') {
+      const fieldVal = safeValue(String(val))
+      ws.push(`      01 ${name} ${picFor(fieldVal)} VALUE "${fieldVal}".`)
+    }
+  }
+
+  const result: string[] = []
+  if (ws.length)    result.push('   WORKING-STORAGE SECTION.', ...ws)
+  if (items.length) result.push('   ITEMS SECTION.', ...items)
+  return result
+}
+
+function csvToRclLines(content: string, filename: string): string[] {
+  const rows = content.trim().split('\n').filter(Boolean)
+  if (rows.length < 2) return []
+
+  const groupName = toRclName(basename(filename, extname(filename)))
+  const headers   = rows[0].split(',').map(h => toRclName(h.trim()))
+  const result: string[] = ['   ITEMS SECTION.', `      01 ${groupName}.`]
+
+  for (let i = 1; i < rows.length; i++) {
+    const cols     = rows[i].split(',')
+    const itemName = `${groupName}-${i}`
+    result.push(`         05 ${itemName}.`)
+    headers.forEach((header, j) => {
+      const fieldName = `${itemName}-${header}`
+      const fieldVal  = safeValue((cols[j] ?? '').trim())
+      result.push(`            10 ${fieldName} ${picFor(fieldVal)} VALUE "${fieldVal}".`)
+    })
+  }
+
+  return result
+}
+
+function resolveDataLoads(source: string, dir: string): string {
+  const lines  = source.split('\n')
+  const result: string[] = []
+  let inData   = false
+
+  for (const line of lines) {
+    const t = line.trim()
+    if (t.startsWith('DATA DIVISION')) { inData = true; result.push(line); continue }
+    if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('DATA DIVISION'))) {
+      inData = false; result.push(line); continue
+    }
+
+    if (inData && t.startsWith('LOAD FROM')) {
+      const match = t.match(/LOAD FROM\s+"([^"]+)"/)
+      if (match) {
+        const filePath = resolveFilePath(match[1], dir)
+        const content  = readFileSync(filePath, 'utf-8')
+        const ext      = extname(filePath).toLowerCase()
+        if (ext === '.json') {
+          result.push(...jsonToRclLines(JSON.parse(content) as Record<string, unknown>))
+        } else if (ext === '.csv') {
+          result.push(...csvToRclLines(content, basename(filePath)))
+        }
+      }
+    } else {
+      result.push(line)
+    }
+  }
+
+  return result.join('\n')
+}
+
 function extractComponentContent(source: string): string[] {
   const lines = source.split('\n')
   const result: string[] = []
@@ -210,9 +312,10 @@ export function compile(inputPath: string, outDir?: string): CompileResult {
 
   let program
   try {
-    const withTheme     = resolveThemeCopies(source, dirname(absInput))
+    const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    program = parse(withComponents)
+    const withData       = resolveDataLoads(withComponents, dirname(absInput))
+    program = parse(withData)
     resolveIncludes(program, dirname(absInput))
   } catch (err) {
     return { ok: false, inputPath: absInput, error: `PARSE ERROR: ${(err as Error).message}` }
@@ -337,7 +440,8 @@ export function check(inputPath: string): CheckResult {
   try {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const program = parse(withComponents)
+    const withData       = resolveDataLoads(withComponents, dirname(absInput))
+    const program = parse(withData)
 
     if (!program.identification.programId) {
       errors.push('IDENTIFICATION DIVISION: PROGRAM-ID IS REQUIRED.')
