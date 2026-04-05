@@ -521,44 +521,75 @@ function renderInput(stmt: DisplayStatement): string {
   </div>`
 }
 
-function renderFooter(stmt: DisplayStatement, data: DataDivision): string {
-  const text         = escapeHtml(resolveValue(stmt.value ?? clause(stmt.clauses, 'TEXT'), data))
-  const align        = clause(stmt.clauses, 'ALIGN', 'LEFT').toLowerCase()
-  const linksRaw     = clause(stmt.clauses, 'LINKS', '')
-  const footerMeta   = resolveValue('FOOTER-META', data)
-  const footerDisc   = resolveValue('FOOTER-DISCLOSURE', data)
+function parseLinkPairs(raw: string): Array<{ label: string; href: string }> {
+  // Each entry is "Label words... https://url" — find the URL by scheme, not position,
+  // so multi-word labels like "AI Platform https://..." are handled correctly.
+  return raw.split(',').map(s => {
+    const trimmed = s.trim()
+    const urlMatch = trimmed.match(/\s+(https?:\/\/\S+)$/)
+    if (urlMatch && urlMatch.index !== undefined) {
+      return { label: trimmed.slice(0, urlMatch.index).trim(), href: urlMatch[1] }
+    }
+    // Fallback for bare paths or single-word labels
+    const parts = trimmed.split(/\s+/)
+    return { label: (parts.slice(0, -1).join(' ') || parts[0]) ?? '', href: parts[parts.length - 1] ?? '#' }
+  }).filter(l => l.label)
+}
 
+function renderFooter(stmt: DisplayStatement, data: DataDivision): string {
+  // Brand: resolve from stmt value first, then FOOTER-BRAND field, then empty
+  const brandRaw   = stmt.value ?? clause(stmt.clauses, 'TEXT')
+  const brand      = escapeHtml(resolveValue(brandRaw, data) || resolveValue('FOOTER-BRAND', data))
+  const align      = clause(stmt.clauses, 'ALIGN', 'LEFT').toLowerCase()
+  const linksRaw   = clause(stmt.clauses, 'LINKS', '')
+
+  // WORKING-STORAGE fields — read in render order: brand → meta → nav-links → disclosure+legal
+  const footerMeta  = resolveValue('FOOTER-META', data)
+  const footerDisc  = resolveValue('FOOTER-DISCLOSURE', data)
+  const footerLegal = resolveValue('FOOTER-LEGAL', data)
+
+  // Meta row
   const metaHtml = footerMeta
     ? `\n    <div class="footer-meta">${escapeHtml(footerMeta)}</div>`
     : ''
-  const discHtml = footerDisc
-    ? `\n    <p class="footer-disclosure">${escapeHtml(footerDisc)}</p>`
-    : ''
 
-  if (linksRaw) {
-    // Parse "Label url, Label url" pairs
-    const links = linksRaw.split(',').map(s => {
-      const parts = s.trim().split(/\s+/)
-      return { label: parts[0] ?? '', href: parts[1] ?? '#' }
-    }).filter(l => l.label)
+  // Disclosure row — plain text + optional inline legal links (· Label · Label)
+  let discHtml = ''
+  if (footerDisc || footerLegal) {
+    let legalHtml = ''
+    if (footerLegal) {
+      const legalLinks = parseLinkPairs(footerLegal)
+      const legalAnchors = legalLinks.map(l =>
+        `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`
+      ).join(' · ')
+      legalHtml = ` <span class="footer-legal"> · ${legalAnchors}</span>`
+    }
+    const discText = footerDisc ? escapeHtml(footerDisc) : ''
+    discHtml = `\n    <p class="footer-disclosure">${discText}${legalHtml}</p>`
+  }
 
-    const linksHtml = links.map(l =>
-      `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`
-    ).join('\n      ')
+  // Rich footer: brand → meta → nav-links → disclosure+legal
+  if (brand || linksRaw || metaHtml || discHtml) {
+    let navHtml = ''
+    if (linksRaw) {
+      const navLinks = parseLinkPairs(linksRaw)
+      const navAnchors = navLinks.map(l =>
+        `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`
+      ).join('\n      ')
+      navHtml = `\n    <div class="footer-links">\n      ${navAnchors}\n    </div>`
+    }
 
     return `<footer>
   <div class="container">
-    <span class="footer-brand">${text}</span>
-    <div class="footer-links">
-      ${linksHtml}
-    </div>${metaHtml}${discHtml}
+    <span class="footer-brand">${brand}</span>${metaHtml}${navHtml}${discHtml}
   </div>
 </footer>`
   }
 
+  // Fallback: simple centred footer
   return `<footer class="align-${align}">
   <div class="container">
-    <p>${text}</p>
+    <p>${brand}</p>
   </div>
 </footer>`
 }
