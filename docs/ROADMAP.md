@@ -188,6 +188,83 @@ Works in both ENVIRONMENT DIVISION (theme COPY FROM) and PROCEDURE DIVISION (com
 
 ---
 
+## Design Observations — Toward 1.0
+
+These are friction points identified while building with RECALL — places where the language
+was implicit when it should have been explicit. They inform what 1.0 needs to harden.
+
+**The pattern:** the language is cognitively lightweight when it is explicit. Every gap
+below is a place where the compiler accepted ambiguous or invalid input silently.
+
+---
+
+### 1. `USING` vs `WITH DATA` vs `WITH PARAM` — three binding mechanisms
+
+Three ways to pass data to elements, each with different semantics:
+- `DISPLAY NAVIGATION USING NAV-ITEMS` — group reference for built-in elements
+- `DISPLAY MY-COMP WITH DATA FIELD1, FIELD2` — DATA DIVISION binding for components
+- `DISPLAY MY-COMP WITH FIELD "literal"` — literal override
+
+The surface area is small but real. A writer new to RECALL has to track which mechanism
+applies where. 1.0 should consider unifying or at minimum documenting the decision rule
+clearly in the language spec.
+
+---
+
+### 2. SPLIT layout requires two sub-SECTION children — not enforced
+
+A SECTION with `WITH LAYOUT SPLIT` expects exactly two child SECTION elements (left and
+right columns). If you write children flat, it compiles and renders — with empty columns.
+The failure is silent. This was caught during `hero.rcpy` component authoring.
+
+**1.0 fix:** compiler should warn or error when LAYOUT SPLIT has no child SECTIONs, or
+when child count doesn't match the layout's expectation.
+
+---
+
+### 3. Palette key period bug — silent failure
+
+```cobol
+COLOR-BG.  "#080a10".   ← wrong: key stored as "COLOR-BG." — lookup fails silently
+COLOR-BG   "#080a10".   ← correct
+```
+
+The compiler accepted the invalid form. The palette default was used instead. No error,
+no warning. Cost real debugging time in the StratIQX integration.
+
+**1.0 fix:** palette parser should reject keys that contain a trailing period, with a
+clear error message pointing to the offending line.
+
+---
+
+### 4. VALUE string content was not opaque to pre-processors and parser
+
+Multi-line VALUE strings containing RECALL syntax (e.g. docs code examples with
+`COMPONENT DIVISION.` or `COPY FROM @...`) confused both the pre-processor pipeline and
+the parser's division tokenizer. Fixed in v0.7.1 (pre-processors) and v0.7.2 (parser),
+but the root issue reveals a design principle:
+
+**The source of truth is the DATA DIVISION, not the rendered output.** Anything inside
+a VALUE string is content, not source. The compiler must treat it as opaque at every
+processing stage. This principle should be tested explicitly in the spec.
+
+---
+
+### 5. The language is light when explicit — the design law for 1.0
+
+Every place where RECALL felt effortless was a place where the language was explicit:
+- What the program IS — declared in IDENTIFICATION DIVISION before anything else
+- What data exists — declared in DATA DIVISION before any rendering
+- What components are available — declared in COMPONENT DIVISION before PROCEDURE
+- What an element renders — determined by the verb, not by context
+
+Every place where friction appeared was a place where the compiler let implicit or
+ambiguous input through. **1.0's goal is not more features — it is tighter contracts.**
+Explicit over implicit, loud errors over silent defaults, the source being unambiguously
+correct.
+
+---
+
 ## v1.0 — Stable Language
 
 **Goal:** Language specification frozen. Compiler is a stable runtime. Component ecosystem exists.
@@ -197,6 +274,7 @@ Works in both ENVIRONMENT DIVISION (theme COPY FROM) and PROCEDURE DIVISION (com
 - The theme layer (palette / font / style-block) is the documented extension point
 - Component libraries are the unit of community contribution
 - Breaking changes require a major version
+- Silent failures become loud errors (see Design Observations above)
 
 **What 1.0 ships with:**
 - `@semanticintent/recall` — stable compiler
