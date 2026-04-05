@@ -124,7 +124,11 @@ function picFor(val: string): string {
 }
 
 function safeValue(val: string): string {
-  return val.replace(/"/g, "'")
+  // Replace " with ' (RECALL VALUE strings are delimited by "), then
+  // encode newlines as literal \n so generated VALUE lines stay single-line.
+  // The DATA parser processes one line at a time — multi-line VALUES only
+  // yield the first line. Literal \n is what cal-source.ts split('\\n') expects.
+  return val.replace(/"/g, "'").replace(/\r?\n/g, '\\n')
 }
 
 function jsonToRclLines(json: Record<string, unknown>): string[] {
