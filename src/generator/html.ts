@@ -444,10 +444,19 @@ function inlineCode(raw: string): string {
     .join('')
 }
 
+function linkCitations(text: string): string {
+  // Replace [N] with a link to #source-N
+  return text.replace(/\[(\d+)\]/g, (_m, n) =>
+    `<a class="cite" href="#source-${n}">[${n}]</a>`
+  )
+}
+
 function renderParagraph(stmt: DisplayStatement, data: DataDivision): string {
-  const text       = inlineCode(resolveValue(stmt.value, data))
+  const raw        = inlineCode(resolveValue(stmt.value, data))
   const color      = clause(stmt.clauses, 'COLOR', '').replace('COLOR-', '').toLowerCase()
   const styleClause = clause(stmt.clauses, 'STYLE', '')
+  const citations  = clause(stmt.clauses, 'CITATIONS', '') === 'YES'
+  const text       = citations ? linkCitations(raw) : raw
   const cssClass   = styleClause ? styleClause.toLowerCase().replace(/_/g, '-') : (color ? `color-${color}` : '')
   return `<p${cssClass ? ` class="${cssClass}"` : ''}>${text}</p>`
 }
@@ -513,9 +522,18 @@ function renderInput(stmt: DisplayStatement): string {
 }
 
 function renderFooter(stmt: DisplayStatement, data: DataDivision): string {
-  const text      = escapeHtml(resolveValue(stmt.value ?? clause(stmt.clauses, 'TEXT'), data))
-  const align     = clause(stmt.clauses, 'ALIGN', 'LEFT').toLowerCase()
-  const linksRaw  = clause(stmt.clauses, 'LINKS', '')
+  const text         = escapeHtml(resolveValue(stmt.value ?? clause(stmt.clauses, 'TEXT'), data))
+  const align        = clause(stmt.clauses, 'ALIGN', 'LEFT').toLowerCase()
+  const linksRaw     = clause(stmt.clauses, 'LINKS', '')
+  const footerMeta   = resolveValue('FOOTER-META', data)
+  const footerDisc   = resolveValue('FOOTER-DISCLOSURE', data)
+
+  const metaHtml = footerMeta
+    ? `\n    <div class="footer-meta">${escapeHtml(footerMeta)}</div>`
+    : ''
+  const discHtml = footerDisc
+    ? `\n    <p class="footer-disclosure">${escapeHtml(footerDisc)}</p>`
+    : ''
 
   if (linksRaw) {
     // Parse "Label url, Label url" pairs
@@ -533,7 +551,7 @@ function renderFooter(stmt: DisplayStatement, data: DataDivision): string {
     <span class="footer-brand">${text}</span>
     <div class="footer-links">
       ${linksHtml}
-    </div>
+    </div>${metaHtml}${discHtml}
   </div>
 </footer>`
   }
