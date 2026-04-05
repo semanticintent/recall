@@ -62,13 +62,13 @@ RECALL is:
 ## Install
 
 ```sh
-npm install -g @semanticintent/recall
+npm install -g @semanticintent/recall-compiler
 ```
 
 Or use it as a library:
 
 ```sh
-npm install @semanticintent/recall
+npm install @semanticintent/recall-compiler
 ```
 
 ---
