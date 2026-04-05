@@ -31,6 +31,7 @@ export interface EnvironmentDivision {
   palette: Record<string, string>
   styleBlock?: string
   plugins: string[]
+  suppressDefaultCss: boolean
 }
 
 export type DataLevel = 1 | 5 | 10
@@ -211,6 +212,9 @@ function parseEnvironment(lines: string[]): EnvironmentDivision {
       if (!result.plugins) result.plugins = []
       result.plugins.push(tokens[2])
     }
+    if (kw === 'SUPPRESS-DEFAULT-CSS' && tokens[1] === 'YES') {
+      result.suppressDefaultCss = true
+    }
 
     // Palette: COLOR-ACCENT #... (shorthand) or 01 COLOR-ACCENT PIC X(7) VALUE "#..."
     if (kw === '01') {
@@ -239,7 +243,8 @@ function parseEnvironment(lines: string[]): EnvironmentDivision {
     language:      result.language      ?? 'EN',
     palette:       result.palette       ?? {},
     styleBlock,
-    plugins:       result.plugins       ?? [],
+    plugins:            result.plugins            ?? [],
+    suppressDefaultCss: result.suppressDefaultCss ?? false,
   }
 }
 

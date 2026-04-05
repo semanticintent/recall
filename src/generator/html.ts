@@ -227,8 +227,6 @@ function renderNavigation(stmt: DisplayStatement, data: DataDivision): string {
   const logo    = clause(stmt.clauses, 'LOGO')
   const groupName = clause(stmt.clauses, 'USING')
   const group   = resolveGroup(groupName, data)
-  const stickyClass = sticky ? ' sticky' : ''
-
   let links = ''
   if (group) {
     // NAV-ITEM-1, NAV-ITEM-1-HREF pairs
@@ -247,8 +245,9 @@ function renderNavigation(stmt: DisplayStatement, data: DataDivision): string {
     links = items.map(it => `<a href="${escapeHtml(it.href)}">${escapeHtml(it.label)}</a>`).join('\n        ')
   }
 
-  return `<nav class="${stickyClass}">
-  <div class="nav-inner">
+  const navClass = sticky ? 'nav-inner sticky' : 'nav-inner'
+  return `<nav${sticky ? ' class="sticky"' : ''}>
+  <div class="${navClass}">
     ${logo ? `<a href="/index.html" class="nav-logo">${escapeHtml(logo)}</a>` : ''}
     <div class="nav-links">
       ${links}
@@ -368,14 +367,17 @@ function groupButtonRows(children: DisplayStatement[]): Array<DisplayStatement |
 }
 
 function renderSection(stmt: DisplayStatement, data: DataDivision, registry: ComponentRegistry = new Map()): string {
-  const id         = clause(stmt.clauses, 'ID')
-  const layout     = clause(stmt.clauses, 'LAYOUT', 'STACK').toLowerCase()
-  const padding    = clause(stmt.clauses, 'PADDING', 'MEDIUM').toLowerCase()
-  const columns    = clause(stmt.clauses, 'COLUMNS', '1')
+  const id          = clause(stmt.clauses, 'ID')
+  const layout      = clause(stmt.clauses, 'LAYOUT', 'STACK').toLowerCase()
+  const padding     = clause(stmt.clauses, 'PADDING', 'MEDIUM').toLowerCase()
+  const columns     = clause(stmt.clauses, 'COLUMNS', '1')
   const styleClause = clause(stmt.clauses, 'STYLE', '').toLowerCase().replace(/[^a-z0-9-]/g, '')
-  const bg         = clause(stmt.clauses, 'BACKGROUND')
+  const classClause = clause(stmt.clauses, 'CLASS', '').trim()  // WITH CLASS overrides computed class entirely
+  const bg          = clause(stmt.clauses, 'BACKGROUND')
   const inlineStyle = bg ? ` style="background:var(--${bg.replace('COLOR-', '').toLowerCase()})"` : ''
-  const sectionClass = `padding-${padding}${styleClause ? ` style-${styleClause}` : ''}`
+  const sectionClass = classClause
+    ? classClause
+    : `padding-${padding}${styleClause ? ` style-${styleClause}` : ''}`
 
   if (layout === 'sidebar') {
     const sidebarStmt  = stmt.children.find(c => c.element === 'SIDEBAR-NAV')
@@ -443,9 +445,11 @@ function inlineCode(raw: string): string {
 }
 
 function renderParagraph(stmt: DisplayStatement, data: DataDivision): string {
-  const text  = inlineCode(resolveValue(stmt.value, data))
-  const color = clause(stmt.clauses, 'COLOR', '').replace('COLOR-', '').toLowerCase()
-  return `<p${color ? ` class="color-${color}"` : ''}>${text}</p>`
+  const text       = inlineCode(resolveValue(stmt.value, data))
+  const color      = clause(stmt.clauses, 'COLOR', '').replace('COLOR-', '').toLowerCase()
+  const styleClause = clause(stmt.clauses, 'STYLE', '')
+  const cssClass   = styleClause ? styleClause.toLowerCase().replace(/_/g, '-') : (color ? `color-${color}` : '')
+  return `<p${cssClass ? ` class="${cssClass}"` : ''}>${text}</p>`
 }
 
 function renderButton(stmt: DisplayStatement, data: DataDivision): string {
@@ -509,8 +513,31 @@ function renderInput(stmt: DisplayStatement): string {
 }
 
 function renderFooter(stmt: DisplayStatement, data: DataDivision): string {
-  const text  = escapeHtml(resolveValue(stmt.value ?? clause(stmt.clauses, 'TEXT'), data))
-  const align = clause(stmt.clauses, 'ALIGN', 'LEFT').toLowerCase()
+  const text      = escapeHtml(resolveValue(stmt.value ?? clause(stmt.clauses, 'TEXT'), data))
+  const align     = clause(stmt.clauses, 'ALIGN', 'LEFT').toLowerCase()
+  const linksRaw  = clause(stmt.clauses, 'LINKS', '')
+
+  if (linksRaw) {
+    // Parse "Label url, Label url" pairs
+    const links = linksRaw.split(',').map(s => {
+      const parts = s.trim().split(/\s+/)
+      return { label: parts[0] ?? '', href: parts[1] ?? '#' }
+    }).filter(l => l.label)
+
+    const linksHtml = links.map(l =>
+      `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`
+    ).join('\n      ')
+
+    return `<footer>
+  <div class="container">
+    <span class="footer-brand">${text}</span>
+    <div class="footer-links">
+      ${linksHtml}
+    </div>
+  </div>
+</footer>`
+  }
+
   return `<footer class="align-${align}">
   <div class="container">
     <p>${text}</p>
@@ -571,8 +598,10 @@ function renderCodeBlock(stmt: DisplayStatement, data: DataDivision): string {
 }
 
 function renderLabel(stmt: DisplayStatement, data: DataDivision): string {
-  const text = escapeHtml(resolveValue(stmt.value, data))
-  return `<div class="recall-label">${text}</div>`
+  const text      = escapeHtml(resolveValue(stmt.value, data))
+  const styleClause = clause(stmt.clauses, 'STYLE')
+  const cssClass  = styleClause ? styleClause.toLowerCase().replace(/_/g, '-') : 'recall-label'
+  return `<div class="${cssClass}">${text}</div>`
 }
 
 function renderImage(stmt: DisplayStatement, data: DataDivision): string {
@@ -741,9 +770,20 @@ export function renderStatement(stmt: DisplayStatement, data: DataDivision): str
 export function generate(program: ReclProgram, source: string): string {
   const { identification: id, environment: env, data, component, procedure } = program
 
-  const baseCss = generateCss(env)
+  // Resolve IDENTIFICATION fields that reference WORKING-STORAGE names
+  const resolveIdField = (val: string | undefined): string | undefined => {
+    if (!val) return undefined
+    if (/^[A-Z][A-Z0-9-]+$/.test(val)) return resolveValue(val, data) || val
+    return val
+  }
+  const pageTitle   = resolveIdField(id.pageTitle)   ?? 'RECALL Page'
+  const description = resolveIdField(id.description)
+  const ogTitle     = resolveIdField(resolveValue('CASE-TITLE', data) || undefined)
+  const ogDesc      = resolveIdField(resolveValue('CASE-SUBTITLE', data) || undefined)
+
+  const baseCss = env.suppressDefaultCss ? '' : generateCss(env)
   const css = env.styleBlock
-    ? `${baseCss}\n/* ── STYLE-BLOCK ── */\n${env.styleBlock}`
+    ? (baseCss ? `${baseCss}\n/* ── STYLE-BLOCK ── */\n${env.styleBlock}` : env.styleBlock)
     : baseCss
   const lang = id.language?.toLowerCase() ?? 'en'
 
@@ -776,6 +816,11 @@ ${'*'.repeat(54)}
     ? `<meta name="viewport" content="width=1200">`
     : `<meta name="viewport" content="width=device-width, initial-scale=1.0">`
 
+  const ogMeta = ogTitle ? `
+  <meta property="og:title" content="${escapeHtml(ogTitle)}">
+  ${ogDesc ? `<meta property="og:description" content="${escapeHtml(ogDesc)}">` : ''}
+  <meta property="og:type" content="article">` : ''
+
   const tabsScript = hasTabs ? `<script>
 document.querySelectorAll('.recall-tabs').forEach(function(tabs) {
   var btns = tabs.querySelectorAll('.recall-tab-btn');
@@ -797,10 +842,10 @@ document.querySelectorAll('.recall-tabs').forEach(function(tabs) {
 <head>
   <meta charset="UTF-8">
   ${viewport}
-  <title>${escapeHtml(id.pageTitle)}</title>
-  ${id.description ? `<meta name="description" content="${escapeHtml(id.description)}">` : ''}
-  ${id.author      ? `<meta name="author" content="${escapeHtml(id.author)}">` : ''}
-  ${id.favicon     ? `<link rel="icon" href="${escapeHtml(id.favicon)}">` : ''}
+  <title>${escapeHtml(pageTitle)}</title>
+  ${description   ? `<meta name="description" content="${escapeHtml(description)}">` : ''}
+  ${id.author     ? `<meta name="author" content="${escapeHtml(id.author)}">` : ''}
+  ${id.favicon    ? `<link rel="icon" href="${escapeHtml(id.favicon)}">` : ''}${ogMeta}
   <style>
 ${css}
   </style>
