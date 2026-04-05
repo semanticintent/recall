@@ -421,7 +421,7 @@ function renderSection(stmt: DisplayStatement, data: DataDivision, registry: Com
 }
 
 function renderHeading(stmt: DisplayStatement, data: DataDivision, level: 1 | 2 | 3): string {
-  const text    = escapeHtml(resolveValue(stmt.value, data))
+  const text    = inlineMarkup(resolveValue(stmt.value, data))
   const style   = clause(stmt.clauses, 'STYLE', '').toLowerCase()
   const color   = clause(stmt.clauses, 'COLOR', '')
   const align   = clause(stmt.clauses, 'ALIGN', '').toLowerCase()
@@ -437,11 +437,28 @@ function renderHeading(stmt: DisplayStatement, data: DataDivision, level: 1 | 2 
   return `<h${level}${classes ? ` class="${classes}"` : ''}>${text}</h${level}>`
 }
 
-function inlineCode(raw: string): string {
+// Inline markup: handles *emphasis* → <em> and `code` → <code>
+// Splits on both patterns so each literal segment is HTML-escaped independently,
+// while the marked segments are wrapped in the appropriate element.
+function inlineMarkup(raw: string): string {
   return raw
-    .split(/`([^`]+)`/)
-    .map((part, i) => i % 2 === 0 ? escapeHtml(part) : `<code>${escapeHtml(part)}</code>`)
+    .split(/(\*[^*]+\*|`[^`]+`)/)
+    .map(part => {
+      if (part.length > 2 && part.startsWith('*') && part.endsWith('*')) {
+        return `<em>${escapeHtml(part.slice(1, -1))}</em>`
+      }
+      if (part.length > 2 && part.startsWith('`') && part.endsWith('`')) {
+        return `<code>${escapeHtml(part.slice(1, -1))}</code>`
+      }
+      return escapeHtml(part)
+    })
     .join('')
+}
+
+// Kept for reference — inlineMarkup supersedes this but the name is preserved
+// in case any internal callers were using it directly.
+function inlineCode(raw: string): string {
+  return inlineMarkup(raw)
 }
 
 function linkCitations(text: string): string {
