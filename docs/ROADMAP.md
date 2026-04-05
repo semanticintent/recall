@@ -24,9 +24,9 @@ This separation is the invariant. New releases add elements or capabilities — 
 | Version | Theme | Status |
 |---|---|---|
 | 0.3.x | Theme layer: PALETTE + FONT + STYLE-BLOCK | ✅ Complete |
-| **0.4.x** | **Data display: TABLE + STAT-GRID** | 🔲 Next |
-| 0.5.x | Component data binding | 🔲 Planned |
-| 0.6.x | Component library resolution (npm) | 🔲 Planned |
+| 0.4.x | Data display: TABLE + STAT-GRID | ✅ Complete |
+| 0.5.x | Component data binding — WITH DATA clause | ✅ Complete |
+| **0.6.x** | **Component library resolution (npm)** | 🔲 Next |
 | 1.0.0 | Stable language + first published component library | 🔲 Planned |
 
 ---
@@ -118,46 +118,47 @@ DATA DIVISION.
 
 ---
 
-## v0.5 — Component Data Binding
+## v0.5 — Component Data Binding ✅ Complete
 
-**Goal:** COMPONENT DIVISION components can declare data parameters and be invoked with DATA bindings from the calling program.
+**Shipped:** `WITH DATA` clause — components receive DATA DIVISION fields by name.
 
-**Syntax (invoking):**
-```cobol
-PROCEDURE DIVISION.
-   RENDER-HERO.
-      DISPLAY CASE-HERO
-         WITH DATA CASE-TITLE, CASE-SUBTITLE, FETCH-SCORE, SECTOR-BADGE.
-      STOP SECTION.
-```
-
-**Syntax (defining in .rcpy):**
+**Syntax:**
 ```cobol
 COMPONENT DIVISION.
    DEFINE CASE-HERO.
-      PARAMETER CASE-TITLE.
-      PARAMETER CASE-SUBTITLE.
-      PARAMETER FETCH-SCORE.
-      PARAMETER SECTOR-BADGE.
-      DISPLAY SECTION ID "hero"
-         WITH LAYOUT CENTERED
-         WITH PADDING LARGE.
+      ACCEPTS CASE-TITLE CASE-SUBTITLE SECTOR-BADGE STATS.
+      DISPLAY SECTION ID "hero" WITH LAYOUT CENTERED WITH PADDING LARGE.
          DISPLAY LABEL SECTOR-BADGE.
          DISPLAY HEADING-1 CASE-TITLE.
          DISPLAY PARAGRAPH CASE-SUBTITLE.
+         DISPLAY STAT-GRID STATS WITH COLUMNS 6.
       STOP SECTION.
+   END DEFINE.
+
+PROCEDURE DIVISION.
+   RENDER.
+      DISPLAY CASE-HERO
+         WITH DATA CASE-TITLE, CASE-SUBTITLE, SECTOR-BADGE, STATS.
+   STOP RUN.
 ```
 
-**Why this matters:** A full StratIQX case page becomes:
+**Binding rules:**
+- Scalars (WORKING-STORAGE fields with a value) → resolved string passed into component
+- Groups (ITEMS groups with children) → name passed as-is; TABLE/STAT-GRID/CARD-LIST resolve lazily from the live data object
+- `WITH PARAM "literal"` clauses still work alongside WITH DATA for overrides
+
+**A full StratIQX case page becomes:**
 ```cobol
 PROCEDURE DIVISION.
    RENDER.
-      DISPLAY CASE-HERO WITH DATA CASE-TITLE, CASE-SUBTITLE, STATS, SECTOR-BADGE.
+      DISPLAY CASE-HERO     WITH DATA CASE-TITLE, CASE-SUBTITLE, STATS, SECTOR-BADGE.
       DISPLAY CASE-ANALYSIS WITH DATA INSIGHT-P1, INSIGHT-P2, DIMENSIONS.
-      DISPLAY CASE-CASCADE WITH DATA FETCH-SCORE, CASCADE-CHAIN, CAL-TRACE.
-      DISPLAY CASE-SOURCES WITH DATA SOURCES.
+      DISPLAY CASE-CASCADE  WITH DATA FETCH-SCORE, CASCADE-CHAIN, CAL-TRACE.
+      DISPLAY CASE-SOURCES  WITH DATA SOURCES.
    STOP RUN.
 ```
+
+**Tests:** 66 passing (8 new in `tests/generator/component-data.test.ts`)
 
 ---
 
