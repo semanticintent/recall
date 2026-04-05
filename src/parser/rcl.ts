@@ -29,6 +29,7 @@ export interface EnvironmentDivision {
   fontSecondary?: string
   language: string
   palette: Record<string, string>
+  styleBlock?: string
 }
 
 export type DataLevel = 1 | 5 | 10
@@ -166,9 +167,36 @@ function parseIdentification(lines: string[]): IdentificationDivision {
 
 function parseEnvironment(lines: string[]): EnvironmentDivision {
   const result: Partial<EnvironmentDivision> = { palette: {} }
+  let inStyleBlock = false
+  const styleLines: string[] = []
+
   for (const raw of lines) {
     const line = cleanLine(raw)
-    if (!line || line.endsWith('SECTION.') || line === 'CONFIGURATION SECTION' || line === 'PALETTE SECTION') continue
+    if (!line) continue
+
+    // Detect STYLE-BLOCK section
+    if (line === 'STYLE-BLOCK' || line === 'STYLE-BLOCK.') {
+      inStyleBlock = true
+      continue
+    }
+
+    // Exit STYLE-BLOCK when another known section starts
+    if (inStyleBlock) {
+      if (line.endsWith('SECTION.') || line.endsWith('SECTION') ||
+          line === 'CONFIGURATION SECTION' || line === 'PALETTE SECTION' ||
+          line === 'FONT SECTION') {
+        inStyleBlock = false
+      } else {
+        // Collect raw lines — strip surrounding quotes if present
+        const stripped = raw.replace(/^\s+/, '')
+        styleLines.push(stripped)
+        continue
+      }
+    }
+
+    if (line.endsWith('SECTION.') || line === 'CONFIGURATION SECTION' ||
+        line === 'PALETTE SECTION' || line === 'FONT SECTION') continue
+
     const tokens = line.replace(/\.$/, '').split(/\s+/)
     const kw = tokens[0]
 
@@ -178,13 +206,25 @@ function parseEnvironment(lines: string[]): EnvironmentDivision {
     if (kw === 'FONT-SECONDARY') result.fontSecondary = extractString(tokens.slice(1).join(' '))
     if (kw === 'LANGUAGE')       result.language      = tokens[1]
 
-    // Palette: 01 COLOR-ACCENT PIC X(7) VALUE "#..."
+    // Palette: COLOR-ACCENT #... (shorthand) or 01 COLOR-ACCENT PIC X(7) VALUE "#..."
     if (kw === '01') {
       const name = tokens[1]
       const { value } = parsePicValue(tokens.slice(2))
       if (name && value) result.palette![name] = value
+    } else if (/^COLOR-/.test(kw)) {
+      const value = extractString(tokens.slice(1).join(' ')) || tokens[1]
+      if (value) result.palette![kw] = value
     }
   }
+
+  // Join style block lines, strip wrapping quotes from multi-line string values
+  let styleBlock: string | undefined
+  if (styleLines.length > 0) {
+    const joined = styleLines.join('\n')
+    // Strip leading/trailing quote if the whole block is wrapped
+    styleBlock = joined.replace(/^["']|["']\.?$/gm, '').trim()
+  }
+
   return {
     viewport:      result.viewport      ?? 'RESPONSIVE',
     colorMode:     result.colorMode     ?? 'DARK',
@@ -192,6 +232,7 @@ function parseEnvironment(lines: string[]): EnvironmentDivision {
     fontSecondary: result.fontSecondary,
     language:      result.language      ?? 'EN',
     palette:       result.palette       ?? {},
+    styleBlock,
   }
 }
 

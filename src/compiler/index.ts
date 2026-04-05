@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, statSy
 import { resolve, basename, dirname, join, relative, extname } from 'node:path'
 import { parse } from '../parser/rcl.js'
 import { generate } from '../generator/html.js'
-import type { DataDivision, ComponentDivision, DisplayStatement } from '../parser/rcl.js'
+import type { DataDivision, ComponentDivision, DisplayStatement, EnvironmentDivision } from '../parser/rcl.js'
 
 // ─────────────────────────────────────────────────────────
 // COPY resolution — merges component files into the AST
@@ -17,6 +17,7 @@ function resolveStatementsInPlace(
   data: DataDivision,
   component: ComponentDivision,
   dir: string,
+  env: EnvironmentDivision,
 ): void {
   let i = 0
   while (i < statements.length) {
@@ -30,13 +31,22 @@ function resolveStatementsInPlace(
       data.items.push(...imported.data.items)
       // Merge component definitions
       component.components.push(...imported.component.components)
+      // Merge environment — palette, fonts, styleBlock from copybook
+      Object.assign(env.palette, imported.environment.palette)
+      if (imported.environment.fontPrimary)   env.fontPrimary   = imported.environment.fontPrimary
+      if (imported.environment.fontSecondary) env.fontSecondary = imported.environment.fontSecondary
+      if (imported.environment.styleBlock) {
+        env.styleBlock = env.styleBlock
+          ? `${env.styleBlock}\n${imported.environment.styleBlock}`
+          : imported.environment.styleBlock
+      }
       // Inline procedure statements
       const inlined = imported.procedure.sections.flatMap(s => s.statements)
       statements.splice(i, 1, ...inlined)
       i += inlined.length
     } else {
       if (stmt.children.length > 0) {
-        resolveStatementsInPlace(stmt.children, data, component, dir)
+        resolveStatementsInPlace(stmt.children, data, component, dir, env)
       }
       i++
     }
@@ -45,7 +55,7 @@ function resolveStatementsInPlace(
 
 function resolveIncludes(program: ReturnType<typeof parse>, dir: string): void {
   for (const section of program.procedure.sections) {
-    resolveStatementsInPlace(section.statements, program.data, program.component, dir)
+    resolveStatementsInPlace(section.statements, program.data, program.component, dir, program.environment)
   }
 }
 

@@ -666,7 +666,10 @@ export function renderStatement(stmt: DisplayStatement, data: DataDivision): str
 export function generate(program: ReclProgram, source: string): string {
   const { identification: id, environment: env, data, component, procedure } = program
 
-  const css  = generateCss(env)
+  const baseCss = generateCss(env)
+  const css = env.styleBlock
+    ? `${baseCss}\n/* ── STYLE-BLOCK ── */\n${env.styleBlock}`
+    : baseCss
   const lang = id.language?.toLowerCase() ?? 'en'
 
   // Build component registry
