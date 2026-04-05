@@ -167,6 +167,18 @@ footer.align-right  { text-align: right; }
 .recall-table th { background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 10px 14px; text-align: left; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
 .recall-table td { border: 1px solid var(--border); padding: 10px 14px; font-family: var(--font-mono); font-size: 13px; color: var(--text); vertical-align: top; line-height: 1.6; }
 .recall-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+.recall-table.striped tr:nth-child(odd) td { background: rgba(255,255,255,0.02); }
+.stat-grid { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 16px 0; }
+.stat-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.stat-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.stat-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.stat-grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
+.stat-grid.cols-6 { grid-template-columns: repeat(6, 1fr); }
+.stat-grid:not([class*="cols-"]) { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.stat-card { background: var(--bg); padding: 20px 16px; text-align: center; }
+.stat-value { font-family: var(--font-mono); font-size: 24px; font-weight: 600; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.stat-label { font-family: var(--font-sans); font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+@media (max-width: 768px) { .stat-grid.cols-5, .stat-grid.cols-6 { grid-template-columns: repeat(3, 1fr); } }
 .recall-callout { padding: 14px 18px; border-left: 3px solid var(--accent); background: rgba(255,255,255,0.03); margin: 20px 0; }
 .recall-callout.type-tip     { border-left-color: #4ade80; }
 .recall-callout.type-warning { border-left-color: #facc15; }
@@ -541,11 +553,14 @@ function renderImage(stmt: DisplayStatement, data: DataDivision): string {
 }
 
 function renderTable(stmt: DisplayStatement, data: DataDivision): string {
-  const groupName  = clause(stmt.clauses, 'USING')
-  const headersRaw = clause(stmt.clauses, 'HEADERS', '')
+  // Group name: from value (v0.4: DISPLAY TABLE DIMENSIONS) or USING clause (legacy)
+  const groupName  = stmt.value ?? clause(stmt.clauses, 'USING')
+  // Column headers: COLUMNS clause (v0.4) or HEADERS (legacy)
+  const headersRaw = clause(stmt.clauses, 'COLUMNS') || clause(stmt.clauses, 'HEADERS', '')
   const headers    = headersRaw ? headersRaw.split(',').map(h => h.trim()) : []
+  const striped    = clause(stmt.clauses, 'STRIPED', 'NO') === 'YES'
   const group      = resolveGroup(groupName, data)
-  if (!group) return `<!-- TABLE: group ${groupName} not found -->`
+  if (!group) return `<!-- TABLE: group "${groupName}" not found -->`
 
   const headerRow = headers.length > 0
     ? `<thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>`
@@ -555,12 +570,38 @@ function renderTable(stmt: DisplayStatement, data: DataDivision): string {
     `<tr>${row.children.map(cell => `<td>${escapeHtml(cell.value)}</td>`).join('')}</tr>`
   ).join('\n    ')
 
-  return `<table class="recall-table">
+  const tableClass = `recall-table${striped ? ' striped' : ''}`
+  return `<table class="${tableClass}">
   ${headerRow}
   <tbody>
     ${rows}
   </tbody>
 </table>`
+}
+
+function renderStatGrid(stmt: DisplayStatement, data: DataDivision): string {
+  // Group name from value: DISPLAY STAT-GRID STATS WITH COLUMNS 6
+  const groupName = stmt.value ?? clause(stmt.clauses, 'USING')
+  const columns   = clause(stmt.clauses, 'COLUMNS', '0')
+  const group     = resolveGroup(groupName, data)
+  if (!group) return `<!-- STAT-GRID: group "${groupName}" not found -->`
+
+  const cards = group.children.map(item => {
+    // Detect VALUE and LABEL fields by name suffix (-VALUE, -LABEL)
+    const valueField = item.children.find(f => f.name.endsWith('-VALUE') || f.name.endsWith('VALUE'))
+    const labelField = item.children.find(f => f.name.endsWith('-LABEL') || f.name.endsWith('LABEL'))
+    const val  = escapeHtml(valueField?.value ?? '')
+    const lbl  = escapeHtml(labelField?.value ?? '')
+    return `<div class="stat-card">
+      <div class="stat-value">${val}</div>
+      <div class="stat-label">${lbl}</div>
+    </div>`
+  }).join('\n    ')
+
+  const colClass = parseInt(columns) > 0 ? ` cols-${columns}` : ''
+  return `<div class="stat-grid${colClass}">
+    ${cards}
+  </div>`
 }
 
 function renderCallout(stmt: DisplayStatement, data: DataDivision): string {
@@ -639,6 +680,7 @@ function renderStatementWithRegistry(
     case 'BANNER':      return renderBanner(stmt, data)
     case 'IMAGE':       return renderImage(stmt, data)
     case 'TABLE':       return renderTable(stmt, data)
+    case 'STAT-GRID':   return renderStatGrid(stmt, data)
     case 'CALLOUT':     return renderCallout(stmt, data)
     case 'TABS':        return renderTabs(stmt, data)
     case 'LINK': {

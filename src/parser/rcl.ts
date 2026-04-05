@@ -63,6 +63,7 @@ export type DisplayElement =
   | 'BUTTON' | 'LINK' | 'IMAGE' | 'DIVIDER'
   | 'SECTION' | 'NAVIGATION' | 'FOOTER'
   | 'CARD-LIST' | 'INPUT' | 'BANNER'
+  | 'TABLE' | 'STAT-GRID'
   | 'COPY'
 
 export interface DisplayClause {
