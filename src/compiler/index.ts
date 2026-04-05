@@ -178,13 +178,32 @@ function csvToRclLines(content: string, filename: string): string[] {
   return result
 }
 
+// Returns true if t is a line that opens a multi-line VALUE string (not closed on same line).
+// Used by pre-processors to skip lines inside VALUE "...multi-line...". content.
+function opensMultilineValue(t: string): boolean {
+  const idx = t.indexOf('VALUE "')
+  if (idx === -1) return false
+  // Single-line: VALUE "..." — ends with ". on same line
+  return !t.trimEnd().endsWith('".')
+}
+
 function resolveDataLoads(source: string, dir: string): string {
   const lines  = source.split('\n')
   const result: string[] = []
   let inData   = false
+  let inValue  = false
 
   for (const line of lines) {
     const t = line.trim()
+
+    // Track multi-line VALUE strings — skip directive detection inside them
+    if (inValue) {
+      result.push(line)
+      if (t.trimEnd().endsWith('".')) inValue = false
+      continue
+    }
+    if (opensMultilineValue(t)) { inValue = true; result.push(line); continue }
+
     if (t.startsWith('DATA DIVISION')) { inData = true; result.push(line); continue }
     if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('DATA DIVISION'))) {
       inData = false; result.push(line); continue
@@ -229,9 +248,18 @@ function resolveComponentCopies(source: string, dir: string): string {
   const lines = source.split('\n')
   const result: string[] = []
   let inComponent = false
+  let inValue     = false
 
   for (const line of lines) {
     const t = line.trim()
+
+    if (inValue) {
+      result.push(line)
+      if (t.trimEnd().endsWith('".')) inValue = false
+      continue
+    }
+    if (opensMultilineValue(t)) { inValue = true; result.push(line); continue }
+
     if (t.startsWith('COMPONENT DIVISION')) { inComponent = true; result.push(line); continue }
     if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('COMPONENT DIVISION'))) {
       inComponent = false; result.push(line); continue
@@ -255,10 +283,19 @@ function resolveComponentCopies(source: string, dir: string): string {
 function resolveThemeCopies(source: string, dir: string): string {
   const lines = source.split('\n')
   const result: string[] = []
-  let inEnv = false
+  let inEnv   = false
+  let inValue = false
 
   for (const line of lines) {
     const t = line.trim()
+
+    if (inValue) {
+      result.push(line)
+      if (t.trimEnd().endsWith('".')) inValue = false
+      continue
+    }
+    if (opensMultilineValue(t)) { inValue = true; result.push(line); continue }
+
     if (t.startsWith('ENVIRONMENT DIVISION')) { inEnv = true; result.push(line); continue }
     if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('ENVIRONMENT DIVISION'))) {
       inEnv = false; result.push(line); continue
