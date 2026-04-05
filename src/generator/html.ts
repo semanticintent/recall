@@ -854,6 +854,11 @@ export function generate(program: ReclProgram, source: string): string {
   const css = env.styleBlock
     ? (baseCss ? `${baseCss}\n/* ── STYLE-BLOCK ── */\n${env.styleBlock}` : env.styleBlock)
     : baseCss
+
+  // THEME-OVERRIDES: raw CSS from the brief, injected after the base theme.
+  // Claude Desktop uses this to give each case its own visual identity —
+  // accent colours, sector palette, emotional tone — without touching the template.
+  const themeOverrides = resolveValue('THEME-OVERRIDES', data)
   const lang = id.language?.toLowerCase() ?? 'en'
 
   // Build component registry
@@ -917,7 +922,7 @@ document.querySelectorAll('.recall-tabs').forEach(function(tabs) {
   ${id.favicon    ? `<link rel="icon" href="${escapeHtml(id.favicon)}">` : ''}${ogMeta}
   <style>
 ${css}
-  </style>
+  </style>${themeOverrides ? `\n  <style id="theme-overrides">\n${themeOverrides}\n  </style>` : ''}
 </head>
 <body id="${id.programId.toLowerCase()}">
 ${body}
