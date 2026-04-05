@@ -473,9 +473,12 @@ function renderParagraph(stmt: DisplayStatement, data: DataDivision): string {
   const color      = clause(stmt.clauses, 'COLOR', '').replace('COLOR-', '').toLowerCase()
   const styleClause = clause(stmt.clauses, 'STYLE', '')
   const citations  = clause(stmt.clauses, 'CITATIONS', '') === 'YES'
+  const hrefRaw    = clause(stmt.clauses, 'HREF', '')
   const text       = citations ? linkCitations(raw) : raw
   const cssClass   = styleClause ? styleClause.toLowerCase().replace(/_/g, '-') : (color ? `color-${color}` : '')
-  return `<p${cssClass ? ` class="${cssClass}"` : ''}>${text}</p>`
+  // WITH HREF: wrap the paragraph text in an anchor
+  const inner      = hrefRaw ? `<a href="${escapeHtml(hrefRaw)}">${text}</a>` : text
+  return `<p${cssClass ? ` class="${cssClass}"` : ''}>${inner}</p>`
 }
 
 function renderButton(stmt: DisplayStatement, data: DataDivision): string {
