@@ -469,7 +469,10 @@ function linkCitations(text: string): string {
 }
 
 function renderParagraph(stmt: DisplayStatement, data: DataDivision): string {
-  const raw        = inlineCode(resolveValue(stmt.value, data))
+  const resolved   = resolveValue(stmt.value, data)
+  // If a variable name could not be resolved, skip rendering (graceful degradation)
+  if (!resolved || (/^[A-Z][A-Z0-9-]+$/.test(stmt.value ?? '') && resolved === stmt.value)) return ''
+  const raw        = inlineCode(resolved)
   const color      = clause(stmt.clauses, 'COLOR', '').replace('COLOR-', '').toLowerCase()
   const styleClause = clause(stmt.clauses, 'STYLE', '')
   const citations  = clause(stmt.clauses, 'CITATIONS', '') === 'YES'
