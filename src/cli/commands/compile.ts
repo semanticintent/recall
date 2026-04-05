@@ -1,11 +1,12 @@
 import { Command } from 'commander'
-import { compile } from '../../compiler/index.js'
+import { compile, loadPlugins } from '../../compiler/index.js'
 
 export const compileCommand = new Command('compile')
   .argument('<file>', 'path to .rcl source file')
   .option('--out <dir>', 'output directory (default: same as source)')
   .description('Transpile a .rcl source file to a self-contained HTML file')
-  .action((file: string, options: { out?: string }) => {
+  .action(async (file: string, options: { out?: string }) => {
+    await loadPlugins(file)
     const result = compile(file, options.out)
 
     if (result.ok) {

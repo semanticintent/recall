@@ -5,8 +5,8 @@ export const buildCommand = new Command('build')
   .argument('<dir>', 'source directory containing .rcl files')
   .option('--out <dir>', 'output directory (default: public/)')
   .description('Compile all .rcl files in a directory to self-contained HTML')
-  .action((dir: string, options: { out?: string }) => {
-    const result = build(dir, options.out)
+  .action(async (dir: string, options: { out?: string }) => {
+    const result = await build(dir, options.out)
 
     if (result.errors.length > 0) {
       console.error(`\nRECALL BUILD ERRORS`)

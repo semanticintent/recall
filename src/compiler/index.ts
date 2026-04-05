@@ -4,6 +4,8 @@
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, statSync } from 'node:fs'
 import { resolve, basename, dirname, join, relative, extname } from 'node:path'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 
 // ─────────────────────────────────────────────────────────
 // Path resolution — relative paths and npm package paths
@@ -329,6 +331,56 @@ export interface CheckResult {
   errors: string[]
 }
 
+// ─────────────────────────────────────────────────────────
+// Plugin loading — LOAD PLUGIN @scope/pkg in ENVIRONMENT DIVISION
+// ─────────────────────────────────────────────────────────
+
+function extractPluginNames(source: string): string[] {
+  const names: string[] = []
+  for (const line of source.split('\n')) {
+    const t = line.trim().replace(/\.$/, '')
+    if (t.startsWith('LOAD PLUGIN ')) {
+      const name = t.replace('LOAD PLUGIN ', '').trim()
+      if (name) names.push(name)
+    }
+  }
+  return names
+}
+
+function resolvePluginEntryPoint(pkgName: string, dir: string): string {
+  let current = dir
+  while (true) {
+    const candidate = join(current, 'node_modules', pkgName)
+    if (existsSync(candidate)) {
+      const pkgJsonPath = join(candidate, 'package.json')
+      if (existsSync(pkgJsonPath)) {
+        const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
+        const main =
+          pkgJson.exports?.['.']?.import ??
+          pkgJson.exports?.['.']?.default ??
+          pkgJson.main ??
+          'index.js'
+        return join(candidate, main)
+      }
+      return join(candidate, 'index.js')
+    }
+    const parent = dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+  throw new Error(`Cannot resolve plugin: "${pkgName}" — is the package installed?`)
+}
+
+export async function loadPlugins(sourcePath: string): Promise<void> {
+  const source = readFileSync(resolve(sourcePath), 'utf-8')
+  const dir = dirname(resolve(sourcePath))
+  const names = extractPluginNames(source)
+  for (const name of names) {
+    const entryPoint = resolvePluginEntryPoint(name, dir)
+    await import(pathToFileURL(entryPoint).href)
+  }
+}
+
 export function compile(inputPath: string, outDir?: string): CompileResult {
   const absInput = resolve(inputPath)
 
@@ -403,7 +455,7 @@ function findRclFiles(dir: string): string[] {
   return results
 }
 
-export function build(srcDir: string, outDir?: string): BuildResult {
+export async function build(srcDir: string, outDir?: string): Promise<BuildResult> {
   const absSrc = resolve(srcDir)
   const absOut = resolve(outDir ?? 'public')
 
@@ -438,6 +490,7 @@ export function build(srcDir: string, outDir?: string): BuildResult {
     const fileOutDir = join(absOut, rel)
     mkdirSync(fileOutDir, { recursive: true })
 
+    await loadPlugins(file)
     const result = compile(file, fileOutDir)
     if (result.ok) {
       compiled.push(result)

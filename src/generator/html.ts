@@ -15,6 +15,18 @@ import type {
 export type ComponentRegistry = Map<string, ComponentDef>
 
 // ─────────────────────────────────────────────────────────
+// Plugin element registry — third-party renderers
+// ─────────────────────────────────────────────────────────
+
+export type PluginRenderer = (stmt: DisplayStatement, data: DataDivision) => string
+
+const pluginRegistry = new Map<string, PluginRenderer>()
+
+export function registerElement(name: string, renderer: PluginRenderer): void {
+  pluginRegistry.set(name.toUpperCase(), renderer)
+}
+
+// ─────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────
 
@@ -711,6 +723,8 @@ function renderStatementWithRegistry(
     default: {
       const def = registry.get(stmt.element)
       if (def) return renderComponent(stmt, data, def, registry)
+      const plugin = pluginRegistry.get(stmt.element)
+      if (plugin) return plugin(stmt, data)
       return `<!-- RECALL: unknown element ${stmt.element} -->`
     }
   }
