@@ -131,7 +131,14 @@ p code { font-family: var(--font-mono); font-size: 0.85em; color: var(--accent);
 .recall-btn:hover { opacity: 0.85; }
 .code-block-wrap { margin: 16px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); width: 100%; }
 .code-block-header { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--border); padding: 9px 16px; }
+.code-block-actions { display: flex; align-items: center; gap: 10px; }
 .code-block-lang { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); opacity: 0.7; }
+.code-copy-btn { background: none; border: none; cursor: pointer; color: var(--muted); padding: 0; opacity: 0.4; transition: opacity 0.15s, color 0.15s; line-height: 1; display: flex; align-items: center; }
+.code-copy-btn:hover { opacity: 0.9; }
+.code-copy-btn.copied { color: var(--accent); opacity: 1; }
+.icon-check { display: none; }
+.code-copy-btn.copied .icon-copy { display: none; }
+.code-copy-btn.copied .icon-check { display: block; }
 .code-block-dots { display: flex; gap: 6px; align-items: center; }
 .code-block-dots span { width: 10px; height: 10px; border-radius: 50%; }
 .code-block-dots span:nth-child(1) { background: #ff5f57; }
@@ -174,6 +181,7 @@ footer.align-right  { text-align: right; }
 .sidebar-group-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: block; }
 .sidebar-link { display: block; font-size: 13px; color: var(--text); opacity: 0.65; padding: 5px 0; transition: color 0.15s, opacity 0.15s; font-family: var(--font-mono); }
 .sidebar-link:hover { color: var(--accent); opacity: 1; }
+.sidebar-link.active { color: var(--accent); opacity: 1; }
 .sidebar-content { padding: 48px; min-width: 0; }
 .recall-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
 .recall-table th { background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 10px 14px; text-align: left; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
@@ -660,10 +668,15 @@ function renderCodeBlock(stmt: DisplayStatement, data: DataDivision): string {
   const isRecall = !lang || ['recall', 'rcl', 'cobol', 'cbl'].includes(lang.toLowerCase())
   const highlighted = isRecall ? syntaxHighlight(escapeHtml(raw)) : escapeHtml(raw)
   const langLabel = lang || 'RECALL'
+  const copyIcon  = `<svg class="icon-copy"  width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`
+  const checkIcon = `<svg class="icon-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
   return `<div class="code-block-wrap">
   <div class="code-block-header">
     <div class="code-block-dots"><span></span><span></span><span></span></div>
-    <span class="code-block-lang">${escapeHtml(langLabel)}</span>
+    <div class="code-block-actions">
+      <button class="code-copy-btn" aria-label="Copy code">${copyIcon}${checkIcon}</button>
+      <span class="code-block-lang">${escapeHtml(langLabel)}</span>
+    </div>
   </div>
   <pre class="code-block">${highlighted}</pre>
 </div>`
@@ -874,7 +887,9 @@ export function generate(program: ReclProgram, source: string): string {
     return section.statements.map(stmt => renderStatementWithRegistry(stmt, data, registry)).join('\n')
   }).join('\n')
 
-  const hasTabs = body.includes('recall-tabs')
+  const hasTabs        = body.includes('recall-tabs')
+  const hasCopyButtons = body.includes('code-block-wrap')
+  const hasSidebar     = body.includes('sidebar-link')
 
   // Source embedding — the core RECALL principle
   const sourceComment = `<!--
@@ -913,6 +928,37 @@ document.querySelectorAll('.recall-tabs').forEach(function(tabs) {
 });
 </script>` : ''
 
+  const copyScript = hasCopyButtons ? `<script>
+document.querySelectorAll('.code-copy-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var pre = btn.closest('.code-block-wrap').querySelector('.code-block');
+    navigator.clipboard.writeText(pre.textContent || '').then(function() {
+      btn.classList.add('copied');
+      setTimeout(function() { btn.classList.remove('copied'); }, 1500);
+    }).catch(function() {});
+  });
+});
+</script>` : ''
+
+  const sidebarScript = hasSidebar ? `<script>
+(function() {
+  var links = document.querySelectorAll('.sidebar-link[href^="#"]');
+  var sections = document.querySelectorAll('section[id]');
+  if (!links.length || !sections.length) return;
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        var id = entry.target.id;
+        links.forEach(function(link) {
+          link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function(s) { observer.observe(s); });
+})();
+</script>` : ''
+
   return `${sourceComment}
 <!DOCTYPE html>
 <html lang="${lang}">
@@ -929,6 +975,6 @@ ${css}
 </head>
 <body id="${id.programId.toLowerCase()}">
 ${body}
-${tabsScript}</body>
+${tabsScript}${copyScript}${sidebarScript}</body>
 </html>`
 }
