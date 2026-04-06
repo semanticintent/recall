@@ -30,7 +30,8 @@ never break the contract between layers.
 | 0.6.x | Component library resolution (npm) | ✅ Complete |
 | **0.7.x** | **Strict mode: structured diagnostics + type checker** | ✅ Complete |
 | **0.8.x** | **AI-first tooling + language evolution** | ✅ Complete |
-| 1.0.0 | Stable language + tighter contracts + first component library | 🔲 Planned |
+| **0.8.1** | **Silent failure elimination + recall-ui v0.1.2** | ✅ Complete |
+| 1.0.0 | Stable language + tighter contracts + first component library | 🟡 Prerequisites met |
 
 ---
 
@@ -178,7 +179,7 @@ error codes fire. Component ecosystem exists.
 - ✅ All 25 error codes actively enforced (completed v0.8.0)
 - ✅ LAYOUT SPLIT structural validation (completed v0.8.1)
 - ✅ Palette key period error — RCL-022 (completed v0.8.1)
-- `@semanticintent/recall-ui` — first published component library
+- ✅ `@semanticintent/recall-ui` — standard component library published (v0.1.2)
 
 **What 1.0 means for RECALL:**
 - The core element vocabulary is complete and stable
@@ -189,7 +190,7 @@ error codes fire. Component ecosystem exists.
 
 **What 1.0 ships with:**
 - `@semanticintent/recall-compiler` — stable compiler, strict by default
-- `@semanticintent/recall-ui` — standard component library (nav, hero, table, stat-grid, cards, forms, cascade, cta, footer)
+- `@semanticintent/recall-ui` v0.1.2 — standard component library: nav, hero, stat-section, card-section, footer + dark theme
 - recall.cormorantforaging.dev — documentation site (built in RECALL)
 
 ---
