@@ -48,9 +48,7 @@ a stable, queryable code with message, reason, and hint.
 - `--format json` — machine-readable diagnostics with `source` and `caret` fields
 - `docs/ERROR-REFERENCE.md` — full per-code reference
 
-**What's NOT yet firing** (codes are defined but not enforced):
-RCL-006, RCL-013, RCL-014, RCL-015 (unstructured), RCL-016, RCL-018, RCL-W05.
-See `docs/STRICT-MODE-SPEC.md` for the gap analysis.
+All 25 diagnostic codes are now active. See `docs/STRICT-MODE-SPEC.md` for the full reference.
 
 ---
 
@@ -177,7 +175,7 @@ Closing this gap is a 1.0 prerequisite.
 error codes fire. Component ecosystem exists.
 
 **Prerequisites:**
-- All 25 error codes actively enforced (close the 7-code gap from v0.7)
+- ✅ All 25 error codes actively enforced (completed v0.8.0)
 - LAYOUT SPLIT structural validation
 - Palette key period error
 - `@semanticintent/recall-ui` — first published component library

@@ -1,7 +1,7 @@
 # RECALL Strict Mode — Structured Diagnostics
 
 > Last updated: April 2026
-> Status: **Shipped — v0.7.x**
+> Status: **All 25 codes enforced — v0.8.0**
 > Current version: 0.8.0
 
 ---
@@ -37,6 +37,7 @@ originally planned v0.9.x schedule. All four phases are complete.
 | 5 | Error reference documentation (`docs/ERROR-REFERENCE.md`) | v0.7.3 |
 | — | `recall explain` — live code queries from CLI | v0.7.x |
 | — | `source` + `caret` fields in JSON output | v0.7.x |
+| — | All 7 previously-unenforced codes now active (RCL-006, 013, 014, 015, 016, 018, W05) | v0.8.0 |
 
 ---
 
@@ -114,69 +115,39 @@ WARNING [RCL-W01] group-shape — uc-228.rcl:44:3
 
 ### Errors — abort compilation
 
-| Code | Category | Description | Status |
-|---|---|---|---|
-| `RCL-001` | type-mismatch | Element expects different PIC type than variable declared | ✅ enforced |
-| `RCL-002` | value-constraint | VALUE exceeds declared PIC length | ✅ enforced |
-| `RCL-003` | unknown-element | DISPLAY references unregistered element name | ✅ enforced |
-| `RCL-004` | unknown-identifier | Variable or group referenced but not declared in DATA DIVISION | ✅ enforced |
-| `RCL-005` | missing-required | Required division absent (PROCEDURE DIVISION) | ✅ enforced |
-| `RCL-006` | missing-required | Required field absent from IDENTIFICATION DIVISION (PAGE-TITLE, PROGRAM-ID) | ⬜ defined, not yet enforced |
-| `RCL-007` | group-shape | USING references a scalar, not a group | ✅ enforced |
-| `RCL-008` | group-shape | GROUP declared but used where scalar expected | ✅ enforced |
-| `RCL-009` | format | DATE value does not match ISO 8601 (YYYY-MM-DD) | ✅ enforced |
-| `RCL-010` | format | URL value does not begin with http/https or / | ✅ enforced |
-| `RCL-011` | format | PCT value outside 0–100 range | ✅ enforced |
-| `RCL-012` | value-constraint | PIC 9 field contains non-numeric characters | ✅ enforced |
-| `RCL-013` | structural | STOP RUN missing from PROCEDURE DIVISION | ⬜ defined, not yet enforced |
-| `RCL-014` | structural | COMPONENT referenced before DEFINE | ⬜ defined, not yet enforced |
-| `RCL-015` | unknown-identifier | COPY FROM path cannot be resolved | ⚠️ fires as string error, not yet structured |
-| `RCL-016` | type-mismatch | ACCEPTS parameter type mismatch in COMPONENT call | ⬜ defined, not yet enforced |
-| `RCL-017` | missing-required | COMPONENT called without a REQUIRED ACCEPTS parameter | ✅ enforced |
-| `RCL-018` | structural | Circular COPY detected | ⬜ defined, not yet enforced |
-| `RCL-019` | structural | RECORD type referenced but not defined | ✅ enforced (preprocessor) |
-| `RCL-020` | value-constraint | VALUE BLOCK encoding error | ✅ enforced (preprocessor) |
-| `RCL-021` | unknown-identifier | LOAD FROM — file not found or parse failed | ✅ enforced (preprocessor) |
+| Code | Category | Description |
+|---|---|---|
+| `RCL-001` | type-mismatch | Element expects different PIC type than variable declared |
+| `RCL-002` | value-constraint | VALUE exceeds declared PIC length |
+| `RCL-003` | unknown-element | DISPLAY references unregistered element name |
+| `RCL-004` | unknown-identifier | Variable or group referenced but not declared in DATA DIVISION |
+| `RCL-005` | missing-required | Required division absent (PROCEDURE DIVISION) |
+| `RCL-006` | missing-required | PROGRAM-ID or PAGE-TITLE absent from IDENTIFICATION DIVISION |
+| `RCL-007` | group-shape | USING references a scalar, not a group |
+| `RCL-008` | group-shape | GROUP declared but used where scalar expected |
+| `RCL-009` | format | DATE value does not match ISO 8601 (YYYY-MM-DD) |
+| `RCL-010` | format | URL value does not begin with http/https or / |
+| `RCL-011` | format | PCT value outside 0–100 range |
+| `RCL-012` | value-constraint | PIC 9 field contains non-numeric characters |
+| `RCL-013` | structural | STOP RUN missing from PROCEDURE DIVISION |
+| `RCL-014` | structural | COMPONENT body references an undefined component name |
+| `RCL-015` | unknown-identifier | COPY FROM path cannot be resolved — structured diagnostic with JSON output |
+| `RCL-016` | type-mismatch | WITH DATA passes a parameter name not declared in ACCEPTS |
+| `RCL-017` | missing-required | COMPONENT called without a REQUIRED ACCEPTS parameter |
+| `RCL-018` | structural | Circular COPY detected — `.rcpy` file includes itself directly or transitively |
+| `RCL-019` | structural | RECORD type referenced but not defined |
+| `RCL-020` | value-constraint | VALUE BLOCK encoding error |
+| `RCL-021` | unknown-identifier | LOAD FROM — file not found or parse failed |
 
 ### Warnings — surface but allow compilation (errors in `--strict`)
 
-| Code | Category | Description | Status |
-|---|---|---|---|
-| `RCL-W01` | group-shape | Group declared but has no items — element will render empty | ✅ enforced |
-| `RCL-W02` | value-constraint | VALUE near PIC length limit (>90% of declared max) | ✅ enforced |
-| `RCL-W03` | format | AUTHOR or DATE-WRITTEN absent from IDENTIFICATION DIVISION | ✅ enforced |
-| `RCL-W04` | structural | Procedure section contains no DISPLAY statements | ✅ enforced |
-| `RCL-W05` | type-mismatch | Implicit string coercion applied (numeric used in text context) | ⬜ defined, not yet enforced |
-
----
-
-## Unimplemented Codes — Next Steps
-
-Seven codes are registered in `codes.ts` (and queryable via `recall explain`) but
-do not yet fire during compilation. These are the remaining gap toward "strict by default":
-
-**RCL-006** — PAGE-TITLE and PROGRAM-ID are currently accepted as absent; the generator
-uses empty string defaults. Should fire when either is missing.
-
-**RCL-013** — STOP RUN is currently structurally optional in the parser. Should be
-enforced in the structural checker pass.
-
-**RCL-014** — Component forward-reference detection requires a two-pass approach over
-the COMPONENT DIVISION before the statement pass runs.
-
-**RCL-015** — COPY FROM errors currently surface as unstructured parse errors in
-`compile()` and `check()` results. Should be converted to structured `RCL-015` entries
-in the `DiagnosticCollector` for consistent JSON output.
-
-**RCL-016** — ACCEPTS parameter type checking requires comparing the declared PIC type
-of passed fields against what the component's ACCEPTS clause expects. Currently only
-presence is checked (RCL-017), not type compatibility.
-
-**RCL-018** — Circular COPY detection requires building a dependency graph across all
-resolved `.rcpy` files and detecting cycles before any content is inlined.
-
-**RCL-W05** — Coercion warning requires tracking when a PIC 9 field is passed to a
-context that accepts PIC X and inserting the warning instead of silently coercing.
+| Code | Category | Description |
+|---|---|---|
+| `RCL-W01` | group-shape | Group declared but has no items — element will render empty |
+| `RCL-W02` | value-constraint | VALUE near PIC length limit (>90% of declared max) |
+| `RCL-W03` | format | AUTHOR or DATE-WRITTEN absent from IDENTIFICATION DIVISION |
+| `RCL-W04` | structural | Procedure section contains no DISPLAY statements |
+| `RCL-W05` | type-mismatch | Numeric field (PIC 9) used in string-accepting element — implicit coercion |
 
 ---
 
