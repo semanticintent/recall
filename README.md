@@ -336,6 +336,12 @@ node bin/recall.js compile examples/landing.rcl
 
 ---
 
+## A note on COBOL
+
+RECALL is an independent language inspired by COBOL's syntax and design philosophy. It shares no code with any COBOL implementation and makes no claim to COBOL compatibility. The COBOL vocabulary — divisions, sections, `DISPLAY`, `WORKING-STORAGE` — is borrowed because it encodes business intent at the language level in a way that no modern web syntax does. That design position, not nostalgia, is what RECALL inherits.
+
+---
+
 ## License
 
 MIT © [semanticintent](https://github.com/semanticintent)
