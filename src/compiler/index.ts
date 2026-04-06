@@ -658,6 +658,21 @@ export async function loadPlugins(sourcePath: string): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────
+// parseFromSource — run full preprocessor pipeline on an in-memory source string
+// Useful when the source is NOT on disk (e.g. old git version retrieved via git show).
+// baseDir is used to resolve COPY FROM / LOAD FROM paths — typically dirname(absFile).
+// ─────────────────────────────────────────────────────────
+
+export function parseFromSource(source: string, baseDir: string): ReturnType<typeof parse> {
+  const withTheme      = resolveThemeCopies(source, baseDir)
+  const withComponents = resolveComponentCopies(withTheme, baseDir)
+  const withBlocks     = resolveBlockValues(withComponents)
+  const recordResult   = resolveRecordTypes(withBlocks)
+  const loadResult     = resolveDataLoads(recordResult.source, baseDir)
+  return parse(loadResult.source)
+}
+
+// ─────────────────────────────────────────────────────────
 // INSPECT — show what LOAD FROM generates before compiling
 // Used by: recall check --inspect
 // ─────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ const program = new Command()
 program
   .name('recall')
   .description('RECALL — the source that remembers. A COBOL-inspired web interface language.')
-  .version('0.2.0')
+  .version('0.8.0')
   .addHelpText('after', `
 Workflow:
   Before writing .rcl — read the language schema:

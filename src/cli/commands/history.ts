@@ -1,9 +1,9 @@
 import { Command } from 'commander'
 import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, dirname } from 'node:path'
 import { execSync } from 'node:child_process'
 import { parse } from '../../parser/rcl.js'
-import { inspect } from '../../compiler/index.js'
+import { inspect, parseFromSource } from '../../compiler/index.js'
 
 interface FieldSnapshot {
   name: string
@@ -84,13 +84,13 @@ export const historyCommand = new Command('history')
       process.exit(1)
     }
 
-    // Past state: parse the raw old source through the same pipeline steps
-    // We use a temp approach: write to a temp file and inspect it,
-    // or just parse the raw source directly for field extraction
+    // Past state: run the full preprocessor pipeline on the old source so that
+    // RECORD type expansions and LOAD FROM generated fields are included in the diff.
+    // Use dirname(absInput) as the base dir — COPY FROM / LOAD FROM paths are relative
+    // to the file location, which hasn't changed between commits.
     let oldProgram: ReturnType<typeof parse>
     try {
-      // Parse old source directly — field names/PIC are usually stable even without preprocessing
-      oldProgram = parse(oldSource)
+      oldProgram = parseFromSource(oldSource, dirname(absInput))
     } catch {
       process.stderr.write(`Could not parse HEAD~${n} version of ${file}\n`)
       process.exit(1)
