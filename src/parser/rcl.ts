@@ -4,6 +4,23 @@
 
 export type Division = 'IDENTIFICATION' | 'ENVIRONMENT' | 'DATA' | 'PROCEDURE' | 'COMPONENT'
 
+// ─────────────────────────────────────────────────────────
+// Source location — attached to every AST node
+// file is empty string from parse(); the compiler/type-checker
+// fills it in once the file path is known.
+// ─────────────────────────────────────────────────────────
+
+export interface NodeLocation {
+  line:   number   // 1-indexed
+  col:    number   // 1-indexed, points to the primary token
+  length: number   // character span of the primary token
+  source: string   // the full raw source line for caret display
+}
+
+// ─────────────────────────────────────────────────────────
+// AST interfaces
+// ─────────────────────────────────────────────────────────
+
 export interface ReclProgram {
   identification: IdentificationDivision
   environment: EnvironmentDivision
@@ -42,6 +59,7 @@ export interface DataField {
   pic: string
   value: string
   children: DataField[]
+  loc?: NodeLocation   // points at the variable name token
 }
 
 export interface DataDivision {
@@ -53,6 +71,7 @@ export interface ComponentDef {
   name: string
   accepts: string[]
   body: DisplayStatement
+  loc?: NodeLocation   // points at the DEFINE name token
 }
 
 export interface ComponentDivision {
@@ -78,15 +97,47 @@ export interface DisplayStatement {
   value?: string        // variable name or literal
   clauses: DisplayClause[]
   children: DisplayStatement[]
+  loc?: NodeLocation   // points at the element name token
 }
 
 export interface ProcedureSection {
   name: string
   statements: DisplayStatement[]
+  loc?: NodeLocation   // points at the section header
 }
 
 export interface ProcedureDivision {
   sections: ProcedureSection[]
+}
+
+// ─────────────────────────────────────────────────────────
+// Internal bucket type — lines with original line numbers
+// ─────────────────────────────────────────────────────────
+
+interface LineEntry {
+  raw:     string   // original source line (untrimmed)
+  lineNum: number   // 1-indexed position in source file
+}
+
+interface JoinedLine {
+  text:    string   // joined/cleaned statement text
+  lineNum: number   // line number of the first line in the join
+  source:  string   // raw source of the first line (for caret display)
+}
+
+// ─────────────────────────────────────────────────────────
+// Location helpers
+// ─────────────────────────────────────────────────────────
+
+/** Find 1-indexed column of a token in a source line. Returns 1 if not found. */
+function findCol(source: string, token: string): number {
+  const idx = source.indexOf(token)
+  return idx >= 0 ? idx + 1 : 1
+}
+
+function makeLoc(lineNum: number, source: string, token: string): NodeLocation {
+  const col = findCol(source, token)
+  return { line: lineNum, col, length: token.length, source }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -143,9 +194,9 @@ function detectDivision(line: string): Division | null {
 // Division parsers
 // ─────────────────────────────────────────────────────────
 
-function parseIdentification(lines: string[]): IdentificationDivision {
+function parseIdentification(lines: LineEntry[]): IdentificationDivision {
   const result: Partial<IdentificationDivision> = {}
-  for (const raw of lines) {
+  for (const { raw } of lines) {
     const line = cleanLine(raw)
     if (!line) continue
     const tokens = line.replace(/\.$/, '').split(/\s+/)
@@ -168,12 +219,12 @@ function parseIdentification(lines: string[]): IdentificationDivision {
   }
 }
 
-function parseEnvironment(lines: string[]): EnvironmentDivision {
+function parseEnvironment(lines: LineEntry[]): EnvironmentDivision {
   const result: Partial<EnvironmentDivision> = { palette: {} }
   let inStyleBlock = false
   const styleLines: string[] = []
 
-  for (const raw of lines) {
+  for (const { raw } of lines) {
     const line = cleanLine(raw)
     if (!line) continue
 
@@ -190,7 +241,6 @@ function parseEnvironment(lines: string[]): EnvironmentDivision {
           line === 'FONT SECTION') {
         inStyleBlock = false
       } else {
-        // Collect raw lines — strip surrounding quotes if present
         const stripped = raw.replace(/^\s+/, '')
         styleLines.push(stripped)
         continue
@@ -227,42 +277,41 @@ function parseEnvironment(lines: string[]): EnvironmentDivision {
     }
   }
 
-  // Join style block lines, strip wrapping quotes from multi-line string values
   let styleBlock: string | undefined
   if (styleLines.length > 0) {
     const joined = styleLines.join('\n')
-    // Strip leading/trailing quote if the whole block is wrapped
     styleBlock = joined.replace(/^["']|["']\.?$/gm, '').trim()
   }
 
   return {
-    viewport:      result.viewport      ?? 'RESPONSIVE',
-    colorMode:     result.colorMode     ?? 'DARK',
-    fontPrimary:   result.fontPrimary,
-    fontSecondary: result.fontSecondary,
-    language:      result.language      ?? 'EN',
-    palette:       result.palette       ?? {},
+    viewport:           result.viewport           ?? 'RESPONSIVE',
+    colorMode:          result.colorMode          ?? 'DARK',
+    fontPrimary:        result.fontPrimary,
+    fontSecondary:      result.fontSecondary,
+    language:           result.language           ?? 'EN',
+    palette:            result.palette            ?? {},
     styleBlock,
     plugins:            result.plugins            ?? [],
     suppressDefaultCss: result.suppressDefaultCss ?? false,
   }
 }
 
-function parseDataField(tokens: string[]): DataField {
+function parseDataField(tokens: string[], lineNum: number, raw: string): DataField {
   const level = parseInt(tokens[0], 10) as DataLevel
   const name = tokens[1]
   const rest = tokens.slice(2)
   const { pic, value } = parsePicValue(rest)
-  return { level, name, pic, value, children: [] }
+  const loc = makeLoc(lineNum, raw, name)
+  return { level, name, pic, value, children: [], loc }
 }
 
-function parseData(lines: string[]): DataDivision {
+function parseData(lines: LineEntry[]): DataDivision {
   const workingStorage: DataField[] = []
   const items: DataField[] = []
   let section: 'WORKING-STORAGE' | 'ITEMS' | null = null
   let stack: DataField[] = []
 
-  for (const raw of lines) {
+  for (const { raw, lineNum } of lines) {
     const line = cleanLine(raw)
     if (!line) continue
     if (line.startsWith('WORKING-STORAGE SECTION')) { section = 'WORKING-STORAGE'; stack = []; continue }
@@ -273,7 +322,7 @@ function parseData(lines: string[]): DataDivision {
     const level = parseInt(tokens[0], 10)
     if (isNaN(level)) continue
 
-    const field = parseDataField(tokens)
+    const field = parseDataField(tokens, lineNum, raw)
     const target = section === 'WORKING-STORAGE' ? workingStorage : items
 
     if (level === 1) {
@@ -321,7 +370,6 @@ function tokeniseLine(line: string): string[] {
 }
 
 function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
-  // Re-tokenise the joined line respecting quoted strings
   const line = rawTokens.join(' ')
   const tokens = tokeniseLine(line)
 
@@ -330,7 +378,6 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
   const clauses: DisplayClause[] = []
 
   let i = 2
-  // Next token might be a value (not a keyword)
   if (i < tokens.length && !['WITH', 'ON-CLICK', 'USING', 'HREF', 'ID'].includes(tokens[i])) {
     value = extractString(tokens[i])
     i++
@@ -339,11 +386,10 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
   while (i < tokens.length) {
     const kw = tokens[i]
     if (kw === 'WITH' && i + 1 < tokens.length && tokens[i + 1] === 'DATA') {
-      // WITH DATA FIELD1, FIELD2, FIELD3 — collect all field names until next WITH or end
       const fields: string[] = []
       let j = i + 2
       while (j < tokens.length && tokens[j] !== 'WITH') {
-        const name = tokens[j].replace(/,+$/, '').trim()  // strip trailing commas
+        const name = tokens[j].replace(/,+$/, '').trim()
         if (name) fields.push(name)
         j++
       }
@@ -359,7 +405,6 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
       clauses.push({ key: 'USING', value: tokens[i + 1] })
       i += 2
     } else if (kw === 'ON-CLICK' && i + 2 < tokens.length) {
-      // ON-CLICK GOTO "#href"
       clauses.push({ key: 'ON-CLICK', value: extractString(tokens[i + 2]) })
       i += 3
     } else if (kw === 'HREF' && i + 1 < tokens.length) {
@@ -370,14 +415,17 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
     }
   }
 
+  // loc attached by caller (has access to lineNum and raw source)
   return { element, value, clauses, children: [] }
 }
 
-function joinContinuationLines(lines: string[]): string[] {
-  const joined: string[] = []
-  let current = ''
+function joinContinuationLines(lines: LineEntry[]): JoinedLine[] {
+  const joined: JoinedLine[] = []
+  let currentText   = ''
+  let currentLineNum = 0
+  let currentSource  = ''
 
-  for (const raw of lines) {
+  for (const { raw, lineNum } of lines) {
     const line = cleanLine(raw)
     if (!line) continue
 
@@ -391,44 +439,52 @@ function joinContinuationLines(lines: string[]): string[] {
       (!line.includes(' ') && line.endsWith('.')) // section header
 
     if (isNewStatement) {
-      if (current) joined.push(current)
-      current = line
+      if (currentText) joined.push({ text: currentText, lineNum: currentLineNum, source: currentSource })
+      currentText    = line
+      currentLineNum = lineNum
+      currentSource  = raw
     } else {
-      current = current ? `${current} ${line}` : line
+      currentText = currentText ? `${currentText} ${line}` : line
+      if (!currentSource) { currentLineNum = lineNum; currentSource = raw }
     }
   }
-  if (current) joined.push(current)
+  if (currentText) joined.push({ text: currentText, lineNum: currentLineNum, source: currentSource })
   return joined
 }
 
-function parseProcedure(lines: string[]): ProcedureDivision {
+function parseProcedure(lines: LineEntry[]): ProcedureDivision {
   const sections: ProcedureSection[] = []
   let current: ProcedureSection | null = null
   const sectionStack: DisplayStatement[] = []
   const joined = joinContinuationLines(lines)
 
-  for (const line of joined) {
-    if (!line || line === 'STOP RUN.') continue
+  for (const { text, lineNum, source } of joined) {
+    if (!text || text === 'STOP RUN.') continue
 
     // Section header: single word ending with .
-    if (!line.startsWith('DISPLAY') && line.endsWith('.') && !line.startsWith('STOP') && !line.includes(' ')) {
-      const name = line.replace(/\.$/, '').trim()
+    if (!text.startsWith('DISPLAY') && text.endsWith('.') && !text.startsWith('STOP') && !text.includes(' ')) {
+      const name = text.replace(/\.$/, '').trim()
       if (name) {
-        current = { name, statements: [] }
+        const loc = makeLoc(lineNum, source, name)
+        current = { name, statements: [], loc }
         sectionStack.length = 0
         sections.push(current)
         continue
       }
     }
 
-    if (line === 'STOP SECTION.') {
+    if (text === 'STOP SECTION.') {
       sectionStack.pop()
       continue
     }
 
-    if (line.startsWith('DISPLAY') && current) {
-      const tokens = line.replace(/\.$/, '').split(/\s+/)
+    if (text.startsWith('DISPLAY') && current) {
+      const tokens = text.replace(/\.$/, '').split(/\s+/)
       const stmt = parseDisplayStatement(tokens)
+      // Attach location — point at the element name (tokens[1])
+      const elementToken = tokens[1] ?? ''
+      stmt.loc = makeLoc(lineNum, source, elementToken)
+
       const parent = sectionStack.length > 0 ? sectionStack[sectionStack.length - 1] : null
       if (stmt.element === 'SECTION') {
         if (parent) {
@@ -444,10 +500,11 @@ function parseProcedure(lines: string[]): ProcedureDivision {
           current.statements.push(stmt)
         }
       }
-    } else if (line.startsWith('COPY FROM') && current) {
-      const tokens = line.replace(/\.$/, '').split(/\s+/)
+    } else if (text.startsWith('COPY FROM') && current) {
+      const tokens = text.replace(/\.$/, '').split(/\s+/)
       const filePath = extractString(tokens.slice(2).join(' '))
-      const stmt: DisplayStatement = { element: 'COPY', value: filePath, clauses: [], children: [] }
+      const loc = makeLoc(lineNum, source, filePath)
+      const stmt: DisplayStatement = { element: 'COPY', value: filePath, clauses: [], children: [], loc }
       const parent = sectionStack.length > 0 ? sectionStack[sectionStack.length - 1] : null
       if (parent) {
         parent.children.push(stmt)
@@ -460,42 +517,42 @@ function parseProcedure(lines: string[]): ProcedureDivision {
   return { sections }
 }
 
-function parseComponentDivision(lines: string[]): ComponentDivision {
+function parseComponentDivision(lines: LineEntry[]): ComponentDivision {
   const components: ComponentDef[] = []
   const joined = joinContinuationLines(lines)
 
   let i = 0
   while (i < joined.length) {
-    const line = joined[i]
+    const { text, lineNum, source } = joined[i]
 
-    if (line.startsWith('DEFINE ')) {
-      const name = line.replace(/^DEFINE\s+/, '').replace(/\.$/, '').trim()
+    if (text.startsWith('DEFINE ')) {
+      const name = text.replace(/^DEFINE\s+/, '').replace(/\.$/, '').trim()
+      const loc = makeLoc(lineNum, source, name)
       let accepts: string[] = []
-      // wrapper SECTION that holds all body children
       const body: DisplayStatement = { element: 'SECTION', clauses: [], children: [] }
       let currentSection: DisplayStatement = body
       i++
 
       const sectionStack: DisplayStatement[] = []
 
-      while (i < joined.length && joined[i] !== 'END DEFINE.') {
+      while (i < joined.length && joined[i].text !== 'END DEFINE.') {
         const inner = joined[i]
 
-        if (inner.startsWith('ACCEPTS ')) {
-          const raw = inner.replace(/^ACCEPTS\s+/, '').replace(/\.$/, '')
+        if (inner.text.startsWith('ACCEPTS ')) {
+          const raw = inner.text.replace(/^ACCEPTS\s+/, '').replace(/\.$/, '')
           accepts = raw.split(/[\s,]+/).filter(Boolean)
-        } else if (inner.startsWith('DISPLAY')) {
-          const tokens = inner.replace(/\.$/, '').split(/\s+/)
+        } else if (inner.text.startsWith('DISPLAY')) {
+          const tokens = inner.text.replace(/\.$/, '').split(/\s+/)
           const stmt = parseDisplayStatement(tokens)
+          const elementToken = tokens[1] ?? ''
+          stmt.loc = makeLoc(inner.lineNum, inner.source, elementToken)
+
           if (stmt.element === 'SECTION') {
             if (currentSection === body && body.clauses.length === 0 && body.children.length === 0) {
-              // First SECTION in the DEFINE block — promote it to be the body
               body.element = 'SECTION'
               body.clauses = stmt.clauses
               body.value   = stmt.value
-              // currentSection stays as body; don't push to stack
             } else {
-              // Nested SECTION — add as child and push current onto stack
               currentSection.children.push(stmt)
               sectionStack.push(currentSection)
               currentSection = stmt
@@ -503,14 +560,14 @@ function parseComponentDivision(lines: string[]): ComponentDivision {
           } else {
             currentSection.children.push(stmt)
           }
-        } else if (inner === 'STOP SECTION.') {
+        } else if (inner.text === 'STOP SECTION.') {
           currentSection = sectionStack.length > 0 ? sectionStack.pop()! : body
         }
 
         i++
       }
 
-      components.push({ name, accepts, body })
+      components.push({ name, accepts, body, loc })
     }
 
     i++
@@ -526,7 +583,7 @@ function parseComponentDivision(lines: string[]): ComponentDivision {
 export function parse(source: string): ReclProgram {
   const rawLines = source.split('\n')
 
-  const buckets: Record<Division, string[]> = {
+  const buckets: Record<Division, LineEntry[]> = {
     IDENTIFICATION: [],
     ENVIRONMENT:    [],
     DATA:           [],
@@ -537,24 +594,26 @@ export function parse(source: string): ReclProgram {
   let currentDivision: Division | null = null
   let inValueString = false
 
-  for (const line of rawLines) {
-    const t = line.trim()
+  for (let i = 0; i < rawLines.length; i++) {
+    const raw = rawLines[i]
+    const lineNum = i + 1   // 1-indexed
+    const t = raw.trim()
 
     // Track multi-line VALUE strings — never detect division headers inside them
     if (inValueString) {
-      if (currentDivision) buckets[currentDivision].push(line)
+      if (currentDivision) buckets[currentDivision].push({ raw, lineNum })
       if (t.endsWith('".')) inValueString = false
       continue
     }
     if (t.includes('VALUE "') && !t.endsWith('".')) {
       inValueString = true
-      if (currentDivision) buckets[currentDivision].push(line)
+      if (currentDivision) buckets[currentDivision].push({ raw, lineNum })
       continue
     }
 
-    const div = detectDivision(line)
+    const div = detectDivision(raw)
     if (div) { currentDivision = div; continue }
-    if (currentDivision) buckets[currentDivision].push(line)
+    if (currentDivision) buckets[currentDivision].push({ raw, lineNum })
   }
 
   return {
