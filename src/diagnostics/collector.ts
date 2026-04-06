@@ -75,17 +75,25 @@ export class DiagnosticCollector {
     return {
       errors:      this.errors().length,
       warnings:    this.warnings().length,
-      diagnostics: this.items.map(d => ({
-        code:     d.code,
-        severity: d.severity,
-        category: d.category,
-        file:     d.location.file,
-        line:     d.location.line,
-        col:      d.location.col,
-        message:  d.message,
-        why:      d.why,
-        hint:     d.hint,
-      })),
+      diagnostics: this.items.map(d => {
+        const source = d.location.source ?? ''
+        const caret  = source
+          ? ' '.repeat(Math.max(0, d.location.col - 1)) + '^'.repeat(Math.max(1, d.location.length))
+          : ''
+        return {
+          code:     d.code,
+          severity: d.severity,
+          category: d.category,
+          file:     d.location.file,
+          line:     d.location.line,
+          col:      d.location.col,
+          message:  d.message,
+          why:      d.why,
+          hint:     d.hint ?? null,
+          source:   source || null,
+          caret:    caret  || null,
+        }
+      }),
     }
   }
 }

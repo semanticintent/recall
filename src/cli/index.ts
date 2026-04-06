@@ -3,6 +3,7 @@ import { compileCommand } from './commands/compile.js'
 import { checkCommand } from './commands/check.js'
 import { buildCommand } from './commands/build.js'
 import { schemaCommand } from './commands/schema.js'
+import { explainCommand } from './commands/explain.js'
 
 const program = new Command()
 
@@ -22,11 +23,17 @@ Workflow:
   Type-check without compiling:
     recall check <file>           text diagnostics
     recall check <file> --strict  warnings promoted to errors
-    recall check <file> --format json  machine-readable diagnostics`)
+    recall check <file> --format json  machine-readable diagnostics
+
+  Look up a diagnostic code:
+    recall explain RCL-007        human-readable entry
+    recall explain RCL-007 --json machine-readable JSON
+    recall explain --list         all codes with summaries`)
 
 program.addCommand(compileCommand)
 program.addCommand(checkCommand)
 program.addCommand(buildCommand)
 program.addCommand(schemaCommand)
+program.addCommand(explainCommand)
 
 program.parse()
