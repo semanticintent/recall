@@ -14,7 +14,10 @@ export const checkCommand = new Command('check')
       if (!formatJson) {
         console.log(`\n  ✓  ${result.inputPath}\n`)
       }
+      // Exit 2 — warnings present but no errors
+      if (result.warnings) process.exit(2)
     } else {
+      // Exit 1 — errors present
       process.exit(1)
     }
   })

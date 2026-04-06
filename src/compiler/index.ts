@@ -329,12 +329,14 @@ export interface CompileResult {
   inputPath: string
   outputPath?: string
   error?: string
+  warnings?: boolean   // true when warnings present (exit code 2)
 }
 
 export interface CheckResult {
   ok: boolean
   inputPath: string
   errors: string[]
+  warnings?: boolean   // true when warnings present (exit code 2)
 }
 
 // ─────────────────────────────────────────────────────────
@@ -444,7 +446,7 @@ export function compile(inputPath: string, outDir?: string, opts: CompileOptions
     return { ok: false, inputPath: absInput, error: `CANNOT WRITE OUTPUT: ${(err as Error).message}` }
   }
 
-  return { ok: true, inputPath: absInput, outputPath }
+  return { ok: true, inputPath: absInput, outputPath, warnings: dc.hasWarnings() }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -565,6 +567,7 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
       ok:        !dc.hasErrors(),
       inputPath: absInput,
       errors:    dc.errors().map(d => `[${d.code}] ${d.message}: ${d.why}`),
+      warnings:  dc.hasWarnings(),
     }
   } catch (err) {
     return { ok: false, inputPath: absInput, errors: [`PARSE ERROR: ${(err as Error).message}`] }

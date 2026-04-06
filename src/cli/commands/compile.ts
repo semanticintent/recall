@@ -14,7 +14,10 @@ export const compileCommand = new Command('compile')
       console.log(`\n✓ COMPILED SUCCESSFULLY`)
       console.log(`  SOURCE: ${result.inputPath}`)
       console.log(`  OUTPUT: ${result.outputPath}\n`)
+      // Exit 2 — warnings present, output written (not an error, but not clean)
+      if (result.warnings) process.exit(2)
     } else {
+      // Exit 1 — errors, no output written
       console.error(`\n  ${result.error}\n`)
       process.exit(1)
     }
