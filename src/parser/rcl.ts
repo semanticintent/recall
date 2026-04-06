@@ -168,7 +168,10 @@ function stripComment(line: string): string {
 
 function cleanLine(raw: string): string {
   const stripped = stripComment(raw)
-  return stripped.trim()
+  const trimmed = stripped.trim()
+  // Treat any line whose first non-space character is * as a comment
+  if (trimmed.startsWith('*')) return ''
+  return trimmed
 }
 
 function extractString(token: string): string {
