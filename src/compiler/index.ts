@@ -29,6 +29,8 @@ function resolveFilePath(specifier: string, dir: string): string {
 }
 import { parse } from '../parser/rcl.js'
 import { generate } from '../generator/html.js'
+import { typeCheck } from '../typechecker/index.js'
+import { printDiagnostics } from '../diagnostics/index.js'
 import type { DataDivision, ComponentDivision, DisplayStatement, EnvironmentDivision } from '../parser/rcl.js'
 
 // ─────────────────────────────────────────────────────────
@@ -385,7 +387,11 @@ export async function loadPlugins(sourcePath: string): Promise<void> {
   }
 }
 
-export function compile(inputPath: string, outDir?: string): CompileResult {
+export interface CompileOptions {
+  strict?: boolean
+}
+
+export function compile(inputPath: string, outDir?: string, opts: CompileOptions = {}): CompileResult {
   const absInput = resolve(inputPath)
 
   if (!existsSync(absInput)) {
@@ -412,6 +418,13 @@ export function compile(inputPath: string, outDir?: string): CompileResult {
     resolveIncludes(program, dirname(absInput))
   } catch (err) {
     return { ok: false, inputPath: absInput, error: `PARSE ERROR: ${(err as Error).message}` }
+  }
+
+  // ── Type check — collect all diagnostics before generating ──
+  const dc = typeCheck(program, absInput, { strict: opts.strict ?? false })
+  if (dc.hasErrors() || dc.hasWarnings()) printDiagnostics(dc)
+  if (dc.hasErrors()) {
+    return { ok: false, inputPath: absInput, error: 'Type errors found — no output written' }
   }
 
   let html: string
@@ -512,9 +525,13 @@ export async function build(srcDir: string, outDir?: string): Promise<BuildResul
   }
 }
 
-export function check(inputPath: string): CheckResult {
+export interface CheckOptions {
+  strict?:     boolean
+  formatJson?: boolean
+}
+
+export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
   const absInput = resolve(inputPath)
-  const errors: string[] = []
 
   if (!existsSync(absInput)) {
     return { ok: false, inputPath: absInput, errors: [`FILE NOT FOUND: ${absInput}`] }
@@ -535,20 +552,21 @@ export function check(inputPath: string): CheckResult {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
     const withData       = resolveDataLoads(withComponents, dirname(absInput))
-    const program = parse(withData)
+    const program        = parse(withData)
+    const dc             = typeCheck(program, absInput, { strict: opts.strict ?? false })
 
-    if (!program.identification.programId) {
-      errors.push('IDENTIFICATION DIVISION: PROGRAM-ID IS REQUIRED.')
+    if (opts.formatJson) {
+      process.stdout.write(JSON.stringify({ file: absInput, ...dc.toJSON() }, null, 2) + '\n')
+    } else {
+      printDiagnostics(dc)
     }
-    if (!program.identification.pageTitle) {
-      errors.push('IDENTIFICATION DIVISION: PAGE-TITLE IS REQUIRED.')
-    }
-    if (program.procedure.sections.length === 0) {
-      errors.push('PROCEDURE DIVISION: NO SECTIONS FOUND. AT LEAST ONE RENDER SECTION IS REQUIRED.')
+
+    return {
+      ok:        !dc.hasErrors(),
+      inputPath: absInput,
+      errors:    dc.errors().map(d => `[${d.code}] ${d.message}: ${d.why}`),
     }
   } catch (err) {
-    errors.push(`PARSE ERROR: ${(err as Error).message}`)
+    return { ok: false, inputPath: absInput, errors: [`PARSE ERROR: ${(err as Error).message}`] }
   }
-
-  return { ok: errors.length === 0, inputPath: absInput, errors }
 }
