@@ -58,6 +58,7 @@ export interface DataField {
   name: string
   pic: string
   value: string
+  comment?: string     // COMMENT "..." clause — intent metadata for AI tooling
   children: DataField[]
   loc?: NodeLocation   // points at the variable name token
 }
@@ -170,15 +171,24 @@ function extractString(token: string): string {
   return token
 }
 
-function parsePicValue(tokens: string[]): { pic: string; value: string } {
-  // e.g. PIC X(60) VALUE "hello"
-  const picIdx = tokens.indexOf('PIC')
-  const valueIdx = tokens.indexOf('VALUE')
+function parsePicValue(tokens: string[]): { pic: string; value: string; comment?: string } {
+  // e.g. PIC X(60) VALUE "hello" COMMENT "intent note"
+  const picIdx     = tokens.indexOf('PIC')
+  const valueIdx   = tokens.indexOf('VALUE')
+  const commentIdx = tokens.indexOf('COMMENT')
   const pic = picIdx >= 0 && picIdx + 1 < tokens.length ? tokens[picIdx + 1] : 'X'
-  const value = valueIdx >= 0 && valueIdx + 1 < tokens.length
-    ? extractString(tokens.slice(valueIdx + 1).join(' '))
+
+  // VALUE ends at COMMENT (if present), otherwise takes the rest
+  const valueEnd = commentIdx >= 0 ? commentIdx : tokens.length
+  const value = valueIdx >= 0 && valueIdx + 1 < valueEnd
+    ? extractString(tokens.slice(valueIdx + 1, valueEnd).join(' '))
     : ''
-  return { pic, value }
+
+  const comment = commentIdx >= 0 && commentIdx + 1 < tokens.length
+    ? extractString(tokens.slice(commentIdx + 1).join(' '))
+    : undefined
+
+  return { pic, value, comment }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -305,9 +315,9 @@ function parseDataField(tokens: string[], lineNum: number, raw: string): DataFie
   const level = parseInt(tokens[0], 10) as DataLevel
   const name = tokens[1]
   const rest = tokens.slice(2)
-  const { pic, value } = parsePicValue(rest)
+  const { pic, value, comment } = parsePicValue(rest)
   const loc = makeLoc(lineNum, raw, name)
-  return { level, name, pic, value, children: [], loc }
+  return { level, name, pic, value, comment, children: [], loc }
 }
 
 function parseData(lines: LineEntry[]): DataDivision {

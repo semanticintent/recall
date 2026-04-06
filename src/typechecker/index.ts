@@ -41,6 +41,7 @@ export interface Symbol {
   isGroup:   boolean
   children:  Symbol[]
   rawPic:    string
+  comment?:  string        // COMMENT clause — intent metadata
 }
 
 /** Parse a PIC declaration string into a PicKind and maxLength */
@@ -73,6 +74,7 @@ function dataFieldToSymbol(field: DataField): Symbol {
     isGroup,
     children:  field.children.map(dataFieldToSymbol),
     rawPic:    field.pic,
+    comment:   field.comment,
   }
 }
 

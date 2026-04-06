@@ -662,23 +662,31 @@ export async function loadPlugins(sourcePath: string): Promise<void> {
 // Used by: recall check --inspect
 // ─────────────────────────────────────────────────────────
 
+export interface FieldComment {
+  name:    string
+  pic:     string
+  section: 'working-storage' | 'items'
+  comment: string
+}
+
 export interface InspectResult {
-  ok:        boolean
-  inputPath: string
-  entries:   LoadFromEntry[]
-  errors:    DataLoadError[]
+  ok:            boolean
+  inputPath:     string
+  entries:       LoadFromEntry[]
+  errors:        DataLoadError[]
+  fieldComments: FieldComment[]   // only fields that have a COMMENT clause
+  program?:      ReturnType<typeof parse>  // parsed program (available when parse succeeds)
 }
 
 export function inspect(inputPath: string): InspectResult {
   const absInput = resolve(inputPath)
-  if (!existsSync(absInput)) {
-    return { ok: false, inputPath: absInput, entries: [], errors: [] }
-  }
+  const empty = { ok: false, inputPath: absInput, entries: [], errors: [], fieldComments: [] }
+  if (!existsSync(absInput)) return empty
   let source: string
   try {
     source = readFileSync(absInput, 'utf-8')
   } catch {
-    return { ok: false, inputPath: absInput, entries: [], errors: [] }
+    return empty
   }
   try {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
@@ -686,14 +694,33 @@ export function inspect(inputPath: string): InspectResult {
     const withBlocks     = resolveBlockValues(withComponents)
     const recordResult   = resolveRecordTypes(withBlocks)
     const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
+
+    // Parse to extract COMMENT clauses from manually declared DATA fields
+    const program = parse(loadResult.source)
+    const fieldComments: FieldComment[] = []
+
+    function collectComments(fields: ReturnType<typeof parse>['data']['workingStorage'], section: FieldComment['section']): void {
+      for (const field of fields) {
+        if (field.comment) {
+          fieldComments.push({ name: field.name, pic: field.pic, section, comment: field.comment })
+        }
+        collectComments(field.children, section)
+      }
+    }
+
+    collectComments(program.data.workingStorage, 'working-storage')
+    collectComments(program.data.items, 'items')
+
     return {
-      ok:        loadResult.errors.length === 0 && recordResult.errors.length === 0,
-      inputPath: absInput,
-      entries:   loadResult.entries,
-      errors:    loadResult.errors,
+      ok:            loadResult.errors.length === 0 && recordResult.errors.length === 0,
+      inputPath:     absInput,
+      entries:       loadResult.entries,
+      errors:        loadResult.errors,
+      fieldComments,
+      program,
     }
   } catch {
-    return { ok: false, inputPath: absInput, entries: [], errors: [] }
+    return empty
   }
 }
 
@@ -709,8 +736,20 @@ export function formatInspectReport(result: InspectResult): string {
     lines.push('')
   }
 
+  // ── FIELD INTENT — only shown when COMMENT clauses are present ──
+  if (result.fieldComments.length > 0) {
+    lines.push('FIELD INTENT')
+    lines.push(hr)
+    for (const f of result.fieldComments) {
+      lines.push(`  ${f.name.padEnd(30)} ${f.pic.padEnd(14)} ${f.comment}`)
+    }
+    lines.push('')
+  }
+
   if (result.entries.length === 0 && result.errors.length === 0) {
-    lines.push('No LOAD FROM directives found in this file.')
+    if (result.fieldComments.length === 0) {
+      lines.push('No LOAD FROM directives or COMMENT clauses found in this file.')
+    }
     return lines.join('\n')
   }
 
@@ -940,6 +979,7 @@ export async function build(srcDir: string, outDir?: string): Promise<BuildResul
 export interface CheckOptions {
   strict?:     boolean
   formatJson?: boolean
+  quiet?:      boolean  // suppress all output; rely on exit code only
 }
 
 export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
@@ -977,10 +1017,12 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
           'Define the RECORD shape in DATA DIVISION before using it'
         )
       }
-      if (opts.formatJson) {
-        process.stdout.write(JSON.stringify({ file: absInput, ...recDc.toJSON() }, null, 2) + '\n')
-      } else {
-        printDiagnostics(recDc)
+      if (!opts.quiet) {
+        if (opts.formatJson) {
+          process.stdout.write(JSON.stringify({ file: absInput, ...recDc.toJSON() }, null, 2) + '\n')
+        } else {
+          printDiagnostics(recDc)
+        }
       }
       return {
         ok: false,
@@ -997,10 +1039,12 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
           'Verify the file path is correct relative to the .rcl source file'
         )
       }
-      if (opts.formatJson) {
-        process.stdout.write(JSON.stringify({ file: absInput, ...loadDc.toJSON() }, null, 2) + '\n')
-      } else {
-        printDiagnostics(loadDc)
+      if (!opts.quiet) {
+        if (opts.formatJson) {
+          process.stdout.write(JSON.stringify({ file: absInput, ...loadDc.toJSON() }, null, 2) + '\n')
+        } else {
+          printDiagnostics(loadDc)
+        }
       }
       return {
         ok: false,
@@ -1012,10 +1056,25 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
     const program = parse(loadResult.source)
     const dc      = typeCheck(program, absInput, { strict: opts.strict ?? false })
 
-    if (opts.formatJson) {
-      process.stdout.write(JSON.stringify({ file: absInput, ...dc.toJSON() }, null, 2) + '\n')
-    } else {
-      printDiagnostics(dc)
+    if (!opts.quiet) {
+      if (opts.formatJson) {
+        // Collect fields that have COMMENT clauses for the intent block
+        const commentedFields: { name: string; pic: string; section: string; comment: string }[] = []
+        function gatherComments(fields: typeof program.data.workingStorage, section: string): void {
+          for (const f of fields) {
+            if (f.comment) commentedFields.push({ name: f.name, pic: f.pic, section, comment: f.comment })
+            gatherComments(f.children, section)
+          }
+        }
+        gatherComments(program.data.workingStorage, 'working-storage')
+        gatherComments(program.data.items, 'items')
+
+        const out: Record<string, unknown> = { file: absInput, ...dc.toJSON() }
+        if (commentedFields.length > 0) out['fieldIntent'] = commentedFields
+        process.stdout.write(JSON.stringify(out, null, 2) + '\n')
+      } else {
+        printDiagnostics(dc)
+      }
     }
 
     return {
