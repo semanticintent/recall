@@ -41,6 +41,11 @@ export interface IdentificationDivision {
   pageTitleSet: boolean   // false when "RECALL Page" default was applied
 }
 
+export interface PaletteKeyError {
+  raw: string        // the key as written, including the trailing period
+  loc: NodeLocation
+}
+
 export interface EnvironmentDivision {
   viewport: 'RESPONSIVE' | 'FIXED-WIDTH' | 'FULL-WIDTH'
   colorMode: 'DARK' | 'LIGHT' | 'SYSTEM'
@@ -48,6 +53,7 @@ export interface EnvironmentDivision {
   fontSecondary?: string
   language: string
   palette: Record<string, string>
+  paletteKeyErrors: PaletteKeyError[]   // keys with trailing periods — RCL-022
   styleBlock?: string
   plugins: string[]
   suppressDefaultCss: boolean
@@ -240,11 +246,11 @@ function parseIdentification(lines: LineEntry[]): IdentificationDivision {
 }
 
 function parseEnvironment(lines: LineEntry[]): EnvironmentDivision {
-  const result: Partial<EnvironmentDivision> = { palette: {} }
+  const result: Partial<EnvironmentDivision> = { palette: {}, paletteKeyErrors: [] }
   let inStyleBlock = false
   const styleLines: string[] = []
 
-  for (const { raw } of lines) {
+  for (const { raw, lineNum } of lines) {
     const line = cleanLine(raw)
     if (!line) continue
 
@@ -292,8 +298,13 @@ function parseEnvironment(lines: LineEntry[]): EnvironmentDivision {
       const { value } = parsePicValue(tokens.slice(2))
       if (name && value) result.palette![name] = value
     } else if (/^COLOR-/.test(kw)) {
-      const value = extractString(tokens.slice(1).join(' ')) || tokens[1]
-      if (value) result.palette![kw] = value
+      if (kw.endsWith('.')) {
+        // RCL-022: trailing period on palette key — flag it, do not store
+        result.paletteKeyErrors!.push({ raw: kw, loc: makeLoc(lineNum, raw, kw) })
+      } else {
+        const value = extractString(tokens.slice(1).join(' ')) || tokens[1]
+        if (value) result.palette![kw] = value
+      }
     }
   }
 
@@ -310,6 +321,7 @@ function parseEnvironment(lines: LineEntry[]): EnvironmentDivision {
     fontSecondary:      result.fontSecondary,
     language:           result.language           ?? 'EN',
     palette:            result.palette            ?? {},
+    paletteKeyErrors:   result.paletteKeyErrors   ?? [],
     styleBlock,
     plugins:            result.plugins            ?? [],
     suppressDefaultCss: result.suppressDefaultCss ?? false,

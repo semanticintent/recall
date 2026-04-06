@@ -1,7 +1,7 @@
 # RECALL Roadmap
 
 > Last updated: April 2026
-> Current version: **0.8.0**
+> Current version: **0.8.1**
 
 ---
 
@@ -176,8 +176,8 @@ error codes fire. Component ecosystem exists.
 
 **Prerequisites:**
 - ✅ All 25 error codes actively enforced (completed v0.8.0)
-- LAYOUT SPLIT structural validation
-- Palette key period error
+- ✅ LAYOUT SPLIT structural validation (completed v0.8.1)
+- ✅ Palette key period error — RCL-022 (completed v0.8.1)
 - `@semanticintent/recall-ui` — first published component library
 
 **What 1.0 means for RECALL:**

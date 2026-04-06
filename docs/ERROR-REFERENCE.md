@@ -1,6 +1,6 @@
 # RECALL Error Reference
 
-> Version: 0.9.x
+> Version: 0.8.1
 > Covers all diagnostic codes emitted by `recall compile` and `recall check`.
 
 Every diagnostic has a stable code. Codes never change meaning between versions.
@@ -32,6 +32,7 @@ Use the code to search this document or link to a specific error.
 | [RCL-016](#rcl-016--component-parameter-type-mismatch) | type-mismatch | Wrong type passed to component ACCEPTS parameter |
 | [RCL-017](#rcl-017--missing-required-component-parameter) | missing-required | Component called without a required ACCEPTS field |
 | [RCL-018](#rcl-018--circular-copy-detected) | structural | COPY FROM chain creates a circular dependency |
+| [RCL-022](#rcl-022--palette-key-has-trailing-period) | format | Palette key has trailing period — colour lookup silently fails |
 
 ### Warnings — shown but compilation continues (errors with `--strict`)
 
@@ -561,6 +562,44 @@ A `COPY FROM` chain creates a cycle — file A copies file B which copies file A
 #### Fix
 
 Restructure components so no file directly or indirectly includes itself. Extract shared content into a third file that neither includes.
+
+---
+
+### RCL-022 — Palette Key Has Trailing Period
+
+**Category:** format | **Severity:** error
+
+A colour key in the `PALETTE SECTION` ends with a period. The parser stores the key with the period included, so any lookup against the clean name silently fails and the colour is never applied to the compiled output.
+
+#### Example
+
+```cobol
+ENVIRONMENT DIVISION.
+   PALETTE SECTION.
+      COLOR-BG.  "#080a10".   ← stored as "COLOR-BG." — lookup for COLOR-BG finds nothing
+      COLOR-FG   "#ffffff".   ← correct
+```
+
+```
+ERROR [RCL-022] format — example.rcl:3:7
+   COLOR-BG.  "#080a10".
+   ^^^^^^^^^
+  Palette key has trailing period
+  Palette key "COLOR-BG." has a trailing period — the colour lookup will never match
+  Hint: Remove the period: COLOR-BG  "#hexvalue".
+```
+
+#### Fix
+
+Remove the period from the key name:
+
+```cobol
+PALETTE SECTION.
+   COLOR-BG  "#080a10".
+   COLOR-FG  "#ffffff".
+```
+
+The `01` form (DATA-style palette entry) is not affected — periods are correctly stripped from that syntax automatically.
 
 ---
 

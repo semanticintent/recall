@@ -1,8 +1,8 @@
 # RECALL Strict Mode — Structured Diagnostics
 
 > Last updated: April 2026
-> Status: **All 25 codes enforced — v0.8.0**
-> Current version: 0.8.0
+> Status: **All 26 codes enforced — v0.8.1**
+> Current version: 0.8.1
 
 ---
 
@@ -138,6 +138,7 @@ WARNING [RCL-W01] group-shape — uc-228.rcl:44:3
 | `RCL-019` | structural | RECORD type referenced but not defined |
 | `RCL-020` | value-constraint | VALUE BLOCK encoding error |
 | `RCL-021` | unknown-identifier | LOAD FROM — file not found or parse failed |
+| `RCL-022` | format | Palette key has trailing period — colour lookup silently fails |
 
 ### Warnings — surface but allow compilation (errors in `--strict`)
 

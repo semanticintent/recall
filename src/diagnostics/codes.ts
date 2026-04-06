@@ -250,6 +250,17 @@ export const CODES: Record<string, CodeDefinition> = {
     seeAlso:     ['RCL-004'],
   },
 
+  'RCL-022': {
+    code:        'RCL-022',
+    severity:    'error',
+    category:    'format',
+    message:     'Palette key has trailing period',
+    description: 'A colour key in the PALETTE SECTION ends with a period. The key is stored with the period included, so any lookup against the clean name silently fails and the colour is never applied to the compiled output.',
+    example:     'COLOR-BG.  "#080a10".   ← key stored as "COLOR-BG." — lookup for COLOR-BG finds nothing',
+    fix:         'Remove the period from the key name: COLOR-BG  "#080a10".',
+    seeAlso:     [],
+  },
+
   // ── Warnings ─────────────────────────────────────────
 
   'RCL-W01': {

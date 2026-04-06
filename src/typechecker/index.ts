@@ -249,6 +249,14 @@ function checkStructural(
       'Add STOP RUN. as the final statement of the PROCEDURE DIVISION'
     )
   }
+
+  // ── RCL-022: Palette key with trailing period ──────────────
+  for (const { raw, loc } of program.environment.paletteKeyErrors) {
+    dc.error('RCL-022', toLoc(loc, file, fallback),
+      `Palette key "${raw}" has a trailing period — the colour lookup will never match`,
+      `Remove the period: ${raw.replace(/\.$/, '')}  "#hexvalue".`
+    )
+  }
 }
 
 // ─────────────────────────────────────────────────────────
