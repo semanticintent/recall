@@ -262,19 +262,19 @@ function renderNavigation(stmt: DisplayStatement, data: DataDivision): string {
 
 function bindParams(
   stmt: DisplayStatement,
-  accepts: string[],
+  acceptNames: string[],
   bindings: Map<string, string>,
 ): DisplayStatement {
   const resolve = (v: string | undefined) =>
-    v !== undefined && accepts.includes(v) ? (bindings.get(v) ?? v) : v
+    v !== undefined && acceptNames.includes(v) ? (bindings.get(v) ?? v) : v
   return {
     element:  stmt.element,
     value:    resolve(stmt.value),
     clauses:  stmt.clauses.map(c => ({
       key:   c.key,
-      value: accepts.includes(c.value) ? (bindings.get(c.value) ?? c.value) : c.value,
+      value: acceptNames.includes(c.value) ? (bindings.get(c.value) ?? c.value) : c.value,
     })),
-    children: stmt.children.map(child => bindParams(child, accepts, bindings)),
+    children: stmt.children.map(child => bindParams(child, acceptNames, bindings)),
   }
 }
 
@@ -284,16 +284,15 @@ function renderComponent(
   def: ComponentDef,
   registry: ComponentRegistry,
 ): string {
-  const bindings = new Map<string, string>()
+  const bindings    = new Map<string, string>()
+  const acceptNames = def.accepts.map(a => a.name)
 
   // WITH DATA FIELD1, FIELD2 — bind by name from DATA DIVISION
-  // Scalars (WORKING-STORAGE with a value) → bind resolved string value
-  // Groups (ITEMS with children) → bind name as-is (TABLE/STAT-GRID resolve lazily)
   const dataClause = stmt.clauses.find(cl => cl.key === 'DATA')
   if (dataClause) {
     const fieldNames = dataClause.value.split(',').map(f => f.trim()).filter(Boolean)
     for (const name of fieldNames) {
-      if (!def.accepts.includes(name)) continue
+      if (!acceptNames.includes(name)) continue
       const field = resolveGroup(name, data)
       if (field) {
         bindings.set(name, field.children.length > 0 ? name : (field.value || name))
@@ -301,14 +300,14 @@ function renderComponent(
     }
   }
 
-  // WITH PARAM "value" — literal clause bindings (existing; fills any params not bound via DATA)
-  for (const param of def.accepts) {
+  // WITH PARAM "value" — literal clause bindings
+  for (const param of acceptNames) {
     if (bindings.has(param)) continue
     const c = stmt.clauses.find(cl => cl.key === param)
     if (c) bindings.set(param, c.value)
   }
 
-  const bound = bindParams(def.body, def.accepts, bindings)
+  const bound = bindParams(def.body, acceptNames, bindings)
   return renderStatementWithRegistry(bound, data, registry)
 }
 

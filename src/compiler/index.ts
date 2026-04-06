@@ -198,6 +198,198 @@ function opensMultilineValue(t: string): boolean {
 }
 
 // ─────────────────────────────────────────────────────────
+// VALUE BLOCK — multi-line string literals (C# 11 raw strings inspiration)
+//
+// Syntax:
+//   01 BODY-TEXT PIC X VALUE BLOCK.
+//      This content spans multiple lines.
+//      No escaping required.
+//   END VALUE.
+//
+// - PIC X with no size is auto-sized to actual content length.
+// - PIC X(n) is kept as-is; RCL-002 fires if content exceeds n.
+// - Lines are joined with \n (same encoding as LOAD FROM values).
+// - Runs before resolveDataLoads so BLOCK values appear as normal fields.
+// ─────────────────────────────────────────────────────────
+
+function resolveBlockValues(source: string): string {
+  const lines = source.split('\n')
+  const result: string[] = []
+  let inBlock = false
+  let blockDecl = ''      // the full declaration line before VALUE BLOCK.
+  let blockIndent = ''    // leading whitespace to restore
+  let blockContent: string[] = []
+
+  for (const line of lines) {
+    const t = line.trim()
+
+    if (inBlock) {
+      if (t === 'END VALUE.' || t === 'END VALUE') {
+        // Join lines and encode as a safe single-line VALUE string
+        const content  = blockContent.join('\n').trim()
+        const safe     = content.replace(/"/g, "'").replace(/\r?\n/g, '\\n')
+        // Auto-size with 20% headroom so RCL-W02 doesn't fire on auto-sized fields
+        const autoSizeN = Math.ceil(safe.length * 1.2)
+        const autoSize  = blockDecl.replace(
+          /\bPIC\s+X\b(?!\s*\()/,
+          `PIC X(${autoSizeN})`
+        )
+        const resolved = autoSize.replace(
+          /\bVALUE\s+BLOCK\.?\s*$/,
+          `VALUE "${safe}".`
+        )
+        result.push(blockIndent + resolved.trimStart())
+        inBlock = false
+        blockContent = []
+        blockDecl = ''
+        blockIndent = ''
+      } else {
+        // Preserve content lines — strip leading indent beyond field indent
+        blockContent.push(t)
+      }
+      continue
+    }
+
+    if (/\bVALUE\s+BLOCK\.?\s*$/.test(t)) {
+      inBlock = true
+      blockDecl = t
+      blockIndent = line.match(/^(\s*)/)?.[1] ?? ''
+      blockContent = []
+      continue
+    }
+
+    result.push(line)
+  }
+
+  return result.join('\n')
+}
+
+// ─────────────────────────────────────────────────────────
+// RECORD types — reusable repeating group shapes (C# 10 records inspiration)
+//
+// Syntax — define a shape once:
+//   RECORD DIMENSION-ROW.
+//      10 DIM-CODE    PIC X(10).
+//      10 DIM-NAME    PIC X(50).
+//      10 DIM-SCORE   PIC 9(2).
+//   END RECORD.
+//
+// Use it in ITEMS SECTION:
+//   01 DIMENSIONS RECORD DIMENSION-ROW ROWS 6.
+//
+// Expands to:
+//   01 DIMENSIONS.
+//      05 DIMENSIONS-1.
+//         10 DIMENSIONS-1-DIM-CODE  PIC X(10).
+//         ...
+//      05 DIMENSIONS-6.
+//         10 DIMENSIONS-6-DIM-CODE  PIC X(10).
+//
+// Field naming: GROUP-N-FIELDNAME  (e.g. DIMENSIONS-1-DIM-CODE)
+// RECORD blocks can appear anywhere in DATA DIVISION — they are removed from
+// output and only their expansions appear.
+// ─────────────────────────────────────────────────────────
+
+export interface RecordExpansionError {
+  line:     string
+  code:     'RCL-021'
+  message:  string
+}
+
+export interface RecordResult {
+  source: string
+  errors: RecordExpansionError[]
+}
+
+function resolveRecordTypes(source: string): RecordResult {
+  const lines  = source.split('\n')
+  const shapes = new Map<string, string[]>()   // shapeName -> field lines (trimmed)
+  const errors: RecordExpansionError[] = []
+
+  // ── Pass 1: collect RECORD shape definitions ─────────────
+  let inRecord  = false
+  let shapeName = ''
+  let shapeFields: string[] = []
+  const stripped: string[] = []
+
+  for (const line of lines) {
+    const t = line.trim()
+
+    if (inRecord) {
+      if (t === 'END RECORD.' || t === 'END RECORD') {
+        shapes.set(shapeName, [...shapeFields])
+        inRecord = false
+        shapeName = ''
+        shapeFields = []
+      } else if (t && !t.startsWith('*')) {
+        shapeFields.push(t)
+      }
+      continue   // RECORD blocks are consumed — not emitted
+    }
+
+    const m = t.match(/^RECORD\s+([A-Z][A-Z0-9-]+)\.?$/)
+    if (m) {
+      inRecord   = true
+      shapeName  = m[1]
+      shapeFields = []
+      continue
+    }
+
+    stripped.push(line)
+  }
+
+  // ── Pass 2: expand RECORD uses ────────────────────────────
+  const result: string[] = []
+
+  for (const line of stripped) {
+    const t = line.trim()
+    const indent = line.match(/^(\s*)/)?.[1] ?? ''
+
+    // 01 GROUP RECORD SHAPE-NAME ROWS n.
+    const useMatch = t.match(
+      /^01\s+([A-Z][A-Z0-9-]+)\s+RECORD\s+([A-Z][A-Z0-9-]+)\s+ROWS\s+(\d+)\.?$/
+    )
+
+    if (useMatch) {
+      const [, groupName, refShape, rowsStr] = useMatch
+      const rows   = parseInt(rowsStr, 10)
+      const fields = shapes.get(refShape)
+
+      if (!fields) {
+        errors.push({
+          line:    t,
+          code:    'RCL-021',
+          message: `RECORD "${refShape}" is not defined — declare it with RECORD ${refShape}. ... END RECORD. in DATA DIVISION`,
+        })
+        // Emit a bare group so the rest of the parse doesn't break
+        result.push(`${indent}01 ${groupName}.`)
+        continue
+      }
+
+      result.push(`${indent}01 ${groupName}.`)
+      for (let i = 1; i <= rows; i++) {
+        const itemName = `${groupName}-${i}`
+        result.push(`${indent}   05 ${itemName}.`)
+        for (const field of fields) {
+          // field: "10 DIM-CODE PIC X(10)." → "10 ITEM-NAME-DIM-CODE PIC X(10)."
+          const expanded = field.replace(
+            /^(\d+\s+)([A-Z][A-Z0-9-]+)(\s+)/,
+            (_match, level, fieldName, space) =>
+              `${level}${itemName}-${fieldName}${space}`
+          )
+          result.push(`${indent}      ${expanded}`)
+        }
+      }
+      continue
+    }
+
+    result.push(line)
+  }
+
+  return { source: result.join('\n'), errors }
+}
+
+// ─────────────────────────────────────────────────────────
 // LOAD FROM shape inspection — what fields would be generated
 // Exported so recall check --inspect can show the shape report
 // ─────────────────────────────────────────────────────────
@@ -491,9 +683,11 @@ export function inspect(inputPath: string): InspectResult {
   try {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const loadResult     = resolveDataLoads(withComponents, dirname(absInput))
+    const withBlocks     = resolveBlockValues(withComponents)
+    const recordResult   = resolveRecordTypes(withBlocks)
+    const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
     return {
-      ok:        loadResult.errors.length === 0,
+      ok:        loadResult.errors.length === 0 && recordResult.errors.length === 0,
       inputPath: absInput,
       entries:   loadResult.entries,
       errors:    loadResult.errors,
@@ -604,7 +798,21 @@ export function compile(inputPath: string, outDir?: string, opts: CompileOptions
   try {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const loadResult     = resolveDataLoads(withComponents, dirname(absInput))
+    const withBlocks     = resolveBlockValues(withComponents)
+    const recordResult   = resolveRecordTypes(withBlocks)
+    const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
+
+    // ── RECORD errors — abort before parse ────────────────
+    if (recordResult.errors.length > 0) {
+      const recDc = new DiagnosticCollector()
+      for (const err of recordResult.errors) {
+        recDc.error(err.code, fileFallback, err.message,
+          'Define the RECORD shape in DATA DIVISION before using it'
+        )
+      }
+      printDiagnostics(recDc)
+      return { ok: false, inputPath: absInput, error: 'RECORD errors — no output written' }
+    }
 
     // ── LOAD FROM errors — abort before parse ─────────────
     if (loadResult.errors.length > 0) {
@@ -757,7 +965,29 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
   try {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const loadResult     = resolveDataLoads(withComponents, dirname(absInput))
+    const withBlocks     = resolveBlockValues(withComponents)
+    const recordResult   = resolveRecordTypes(withBlocks)
+    const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
+
+    // ── RECORD errors ─────────────────────────────────────
+    if (recordResult.errors.length > 0) {
+      const recDc = new DiagnosticCollector()
+      for (const err of recordResult.errors) {
+        recDc.error(err.code, fileFallback, err.message,
+          'Define the RECORD shape in DATA DIVISION before using it'
+        )
+      }
+      if (opts.formatJson) {
+        process.stdout.write(JSON.stringify({ file: absInput, ...recDc.toJSON() }, null, 2) + '\n')
+      } else {
+        printDiagnostics(recDc)
+      }
+      return {
+        ok: false,
+        inputPath: absInput,
+        errors: recordResult.errors.map(e => `[${e.code}] ${e.message}`),
+      }
+    }
 
     // ── LOAD FROM errors ──────────────────────────────────
     if (loadResult.errors.length > 0) {

@@ -239,6 +239,17 @@ export const CODES: Record<string, CodeDefinition> = {
     seeAlso:     ['RCL-019'],
   },
 
+  'RCL-021': {
+    code:        'RCL-021',
+    severity:    'error',
+    category:    'unknown-identifier',
+    message:     'Unknown RECORD type',
+    description: 'A RECORD expansion (01 GROUP RECORD SHAPE ROWS n.) references a shape name that was never defined with a RECORD...END RECORD block in the DATA DIVISION.',
+    example:     '01 METRICS RECORD METRIC-ROW ROWS 4.   ← METRIC-ROW not defined',
+    fix:         'Define the record shape before using it:\n  RECORD METRIC-ROW.\n     10 LABEL PIC X(50).\n     10 VALUE PIC X(20).\n  END RECORD.',
+    seeAlso:     ['RCL-004'],
+  },
+
   // ── Warnings ─────────────────────────────────────────
 
   'RCL-W01': {

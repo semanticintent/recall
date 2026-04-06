@@ -244,11 +244,12 @@ function checkStructural(
 // ─────────────────────────────────────────────────────────
 
 function checkStatement(
-  stmt:       DisplayStatement,
-  symbols:    SymbolTable,
-  file:       string,
-  hasPlugins: boolean,
-  dc:         DiagnosticCollector,
+  stmt:           DisplayStatement,
+  symbols:        SymbolTable,
+  file:           string,
+  hasPlugins:     boolean,
+  componentNames: Set<string>,
+  dc:             DiagnosticCollector,
 ): void {
   const fallback = UNKNOWN_LOC(file)
   const loc = toLoc(stmt.loc, file, fallback)
@@ -257,7 +258,7 @@ function checkStatement(
   // Skip COPY and SECTION — not type-checked at element level
   if (element === 'COPY' || element === 'SECTION') {
     for (const child of stmt.children) {
-      checkStatement(child, symbols, file, hasPlugins, dc)
+      checkStatement(child, symbols, file, hasPlugins, componentNames, dc)
     }
     return
   }
@@ -265,16 +266,16 @@ function checkStatement(
   // ── RCL-003 Unknown element ────────────────────────────
   const contract = BUILT_IN_ELEMENTS[element]
   if (!contract) {
-    if (!hasPlugins) {
+    // Component calls and plugin elements are both valid — skip RCL-003
+    if (!hasPlugins && !componentNames.has(element)) {
       const suggestion = didYouMean(element, [...KNOWN_ELEMENT_NAMES])
       dc.error('RCL-003', loc,
         `No element ${element} is registered`,
         suggestion ? `Did you mean: ${suggestion}?` : 'Check element name spelling or add LOAD PLUGIN in ENVIRONMENT DIVISION'
       )
     }
-    // If plugins present, unknown elements are allowed — skip further checks
     for (const child of stmt.children) {
-      checkStatement(child, symbols, file, hasPlugins, dc)
+      checkStatement(child, symbols, file, hasPlugins, componentNames, dc)
     }
     return
   }
@@ -380,16 +381,17 @@ function checkStatement(
 
   // ── Recurse into children ──────────────────────────────
   for (const child of stmt.children) {
-    checkStatement(child, symbols, file, hasPlugins, dc)
+    checkStatement(child, symbols, file, hasPlugins, componentNames, dc)
   }
 }
 
 function checkStatements(
-  program:    ReclProgram,
-  symbols:    SymbolTable,
-  file:       string,
-  hasPlugins: boolean,
-  dc:         DiagnosticCollector,
+  program:        ReclProgram,
+  symbols:        SymbolTable,
+  file:           string,
+  hasPlugins:     boolean,
+  componentNames: Set<string>,
+  dc:             DiagnosticCollector,
 ): void {
   for (const section of program.procedure.sections) {
     // RCL-W04 — empty section
@@ -401,7 +403,7 @@ function checkStatements(
       )
     }
     for (const stmt of section.statements) {
-      checkStatement(stmt, symbols, file, hasPlugins, dc)
+      checkStatement(stmt, symbols, file, hasPlugins, componentNames, dc)
     }
   }
 }
@@ -422,30 +424,41 @@ function checkComponents(
   for (const component of program.component.components) {
     const loc = toLoc(component.loc, file, fallback)
 
-    // Check that ACCEPTS parameters are used in the body
-    // (light check — full parameter binding validation is future work)
     if (component.accepts.length === 0) {
       dc.warning('RCL-W03', loc,
         `Component ${component.name} has no ACCEPTS parameters`,
-        'Add: ACCEPTS PARAM-1, PARAM-2.'
+        'Add: ACCEPTS PARAM-1 REQUIRED, PARAM-2.'
       )
     }
   }
 
-  // Check for DISPLAY of a component that isn't defined
-  function walkForComponents(stmts: typeof program.procedure.sections[0]['statements']): void {
+  // Check that REQUIRED parameters are provided at every call site
+  function walkForRequiredParams(
+    stmts: typeof program.procedure.sections[0]['statements']
+  ): void {
     for (const stmt of stmts) {
-      if (stmt.element !== 'COPY' && !BUILT_IN_ELEMENTS[stmt.element] && definedNames.has(stmt.element)) {
-        // Valid component reference — no error
-      } else if (stmt.element !== 'COPY' && !BUILT_IN_ELEMENTS[stmt.element] && !definedNames.has(stmt.element)) {
-        // Could be a plugin element — handled in Pass 3
+      if (definedNames.has(stmt.element)) {
+        const def = program.component.components.find(c => c.name === stmt.element)!
+        const required = def.accepts.filter(a => a.required)
+        for (const param of required) {
+          const provided =
+            stmt.clauses.some(c => c.key === param.name) ||
+            stmt.clauses.some(c => c.key === 'DATA' &&
+              c.value.split(',').map(s => s.trim()).includes(param.name))
+          if (!provided) {
+            dc.error('RCL-017', toLoc(stmt.loc, file, fallback),
+              `${stmt.element} is missing required parameter "${param.name}"`,
+              `Add: WITH ${param.name} <value>`
+            )
+          }
+        }
       }
-      walkForComponents(stmt.children)
+      walkForRequiredParams(stmt.children)
     }
   }
 
   for (const section of program.procedure.sections) {
-    walkForComponents(section.statements)
+    walkForRequiredParams(section.statements)
   }
 }
 
@@ -542,12 +555,13 @@ export function typeCheck(
 ): DiagnosticCollector {
   const dc = new DiagnosticCollector()
 
-  const symbols    = buildSymbolTable(program)
-  const hasPlugins = program.environment.plugins.length > 0
+  const symbols        = buildSymbolTable(program)
+  const hasPlugins     = program.environment.plugins.length > 0
+  const componentNames = new Set(program.component.components.map(c => c.name))
 
   checkStructural(program, file, dc)
   checkDataValues(program, file, dc)
-  checkStatements(program, symbols, file, hasPlugins, dc)
+  checkStatements(program, symbols, file, hasPlugins, componentNames, dc)
   checkComponents(program, symbols, file, dc)
 
   if (opts.strict) dc.promoteWarnings()

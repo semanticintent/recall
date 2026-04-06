@@ -67,9 +67,14 @@ export interface DataDivision {
   items: DataField[]
 }
 
+export interface AcceptsParam {
+  name:     string
+  required: boolean   // declared with REQUIRED keyword
+}
+
 export interface ComponentDef {
   name: string
-  accepts: string[]
+  accepts: AcceptsParam[]
   body: DisplayStatement
   loc?: NodeLocation   // points at the DEFINE name token
 }
@@ -528,7 +533,7 @@ function parseComponentDivision(lines: LineEntry[]): ComponentDivision {
     if (text.startsWith('DEFINE ')) {
       const name = text.replace(/^DEFINE\s+/, '').replace(/\.$/, '').trim()
       const loc = makeLoc(lineNum, source, name)
-      let accepts: string[] = []
+      let accepts: AcceptsParam[] = []
       const body: DisplayStatement = { element: 'SECTION', clauses: [], children: [] }
       let currentSection: DisplayStatement = body
       i++
@@ -540,7 +545,11 @@ function parseComponentDivision(lines: LineEntry[]): ComponentDivision {
 
         if (inner.text.startsWith('ACCEPTS ')) {
           const raw = inner.text.replace(/^ACCEPTS\s+/, '').replace(/\.$/, '')
-          accepts = raw.split(/[\s,]+/).filter(Boolean)
+          // Split on commas; each item may be "PARAM-NAME" or "PARAM-NAME REQUIRED"
+          accepts = raw.split(',').map(s => s.trim()).filter(Boolean).map(item => {
+            const parts = item.split(/\s+/)
+            return { name: parts[0], required: parts.includes('REQUIRED') }
+          })
         } else if (inner.text.startsWith('DISPLAY')) {
           const tokens = inner.text.replace(/\.$/, '').split(/\s+/)
           const stmt = parseDisplayStatement(tokens)
