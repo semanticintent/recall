@@ -565,10 +565,11 @@ function renderFooter(stmt: DisplayStatement, data: DataDivision): string {
   const align      = clause(stmt.clauses, 'ALIGN', 'LEFT').toLowerCase()
   const linksRaw   = clause(stmt.clauses, 'LINKS', '')
 
-  // WORKING-STORAGE fields — read in render order: brand → meta → nav-links → disclosure+legal
-  const footerMeta  = resolveValue('FOOTER-META', data)
-  const footerDisc  = resolveValue('FOOTER-DISCLOSURE', data)
-  const footerLegal = resolveValue('FOOTER-LEGAL', data)
+  // WORKING-STORAGE fields — only use if field actually exists in data (avoid leaking field names as text)
+  const allFields   = [...data.workingStorage, ...data.items]
+  const footerMeta  = allFields.find(f => f.name === 'FOOTER-META')?.value  ?? ''
+  const footerDisc  = allFields.find(f => f.name === 'FOOTER-DISCLOSURE')?.value ?? ''
+  const footerLegal = allFields.find(f => f.name === 'FOOTER-LEGAL')?.value ?? ''
 
   // Meta row
   const metaHtml = footerMeta
