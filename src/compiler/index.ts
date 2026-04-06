@@ -250,7 +250,11 @@ function resolveBlockValues(source: string): string {
       continue
     }
 
-    if (/\bVALUE\s+BLOCK\.?\s*$/.test(t)) {
+    // Only match VALUE BLOCK when the keyword is NOT inside a quoted VALUE string.
+    // A line like: 01 FOO PIC X(100) VALUE "... PIC X VALUE BLOCK.  contains VALUE " before
+    // the match — that means VALUE BLOCK is inside a string literal, not a real declaration.
+    const blockMatch = /\bVALUE\s+BLOCK\.?\s*$/.exec(t)
+    if (blockMatch && !t.slice(0, blockMatch.index).includes('"')) {
       inBlock = true
       blockDecl = t
       blockIndent = line.match(/^(\s*)/)?.[1] ?? ''
@@ -307,13 +311,26 @@ function resolveRecordTypes(source: string): RecordResult {
   const errors: RecordExpansionError[] = []
 
   // ── Pass 1: collect RECORD shape definitions ─────────────
-  let inRecord  = false
+  let inRecord     = false
+  let inValueStr   = false   // skip content inside multi-line VALUE strings
   let shapeName = ''
   let shapeFields: string[] = []
   const stripped: string[] = []
 
   for (const line of lines) {
     const t = line.trim()
+
+    // Track multi-line VALUE strings — never process RECORD syntax inside them
+    if (inValueStr) {
+      stripped.push(line)
+      if (t.endsWith('".')) inValueStr = false
+      continue
+    }
+    if (t.includes('VALUE "') && !t.endsWith('".')) {
+      inValueStr = true
+      stripped.push(line)
+      continue
+    }
 
     if (inRecord) {
       if (t === 'END RECORD.' || t === 'END RECORD') {
@@ -340,10 +357,23 @@ function resolveRecordTypes(source: string): RecordResult {
 
   // ── Pass 2: expand RECORD uses ────────────────────────────
   const result: string[] = []
+  let inValueStr2 = false   // skip content inside multi-line VALUE strings
 
   for (const line of stripped) {
     const t = line.trim()
     const indent = line.match(/^(\s*)/)?.[1] ?? ''
+
+    // Track multi-line VALUE strings — never expand RECORD uses inside them
+    if (inValueStr2) {
+      result.push(line)
+      if (t.endsWith('".')) inValueStr2 = false
+      continue
+    }
+    if (t.includes('VALUE "') && !t.endsWith('".')) {
+      inValueStr2 = true
+      result.push(line)
+      continue
+    }
 
     // 01 GROUP RECORD SHAPE-NAME ROWS n.
     const useMatch = t.match(

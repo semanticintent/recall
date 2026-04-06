@@ -31,6 +31,7 @@ never break the contract between layers.
 | **0.7.x** | **Strict mode: structured diagnostics + type checker** | ✅ Complete |
 | **0.8.x** | **AI-first tooling + language evolution** | ✅ Complete |
 | **0.8.1** | **Silent failure elimination + recall-ui v0.1.2** | ✅ Complete |
+| **0.8.2** | **Preprocessor opaqueness fixes (VALUE BLOCK + RECORD in VALUE strings)** | ✅ Complete |
 | 1.0.0 | Stable language + tighter contracts + first component library | 🟡 Prerequisites met |
 
 ---
