@@ -31,7 +31,9 @@ import { parse } from '../parser/rcl.js'
 import { generate } from '../generator/html.js'
 import { typeCheck } from '../typechecker/index.js'
 import { printDiagnostics } from '../diagnostics/index.js'
+import { DiagnosticCollector } from '../diagnostics/collector.js'
 import type { DataDivision, ComponentDivision, DisplayStatement, EnvironmentDivision } from '../parser/rcl.js'
+import type { SourceLocation } from '../diagnostics/types.js'
 
 // ─────────────────────────────────────────────────────────
 // COPY resolution — merges component files into the AST
@@ -195,11 +197,38 @@ function opensMultilineValue(t: string): boolean {
   return !t.trimEnd().endsWith('".')
 }
 
-function resolveDataLoads(source: string, dir: string): string {
-  const lines  = source.split('\n')
+// ─────────────────────────────────────────────────────────
+// LOAD FROM shape inspection — what fields would be generated
+// Exported so recall check --inspect can show the shape report
+// ─────────────────────────────────────────────────────────
+
+export interface LoadFromEntry {
+  directive: string     // raw LOAD FROM "..." line
+  file:      string     // resolved absolute path
+  ext:       string     // 'json' | 'csv'
+  generated: string[]   // the RCL lines that were inlined
+}
+
+export interface DataLoadError {
+  directive: string
+  specifier: string    // the path as written in source
+  code:      'RCL-019' | 'RCL-020'
+  message:   string
+}
+
+export interface DataLoadResult {
+  source:  string
+  entries: LoadFromEntry[]   // successful loads
+  errors:  DataLoadError[]   // structured failures
+}
+
+function resolveDataLoads(source: string, dir: string): DataLoadResult {
+  const lines   = source.split('\n')
   const result: string[] = []
-  let inData   = false
-  let inValue  = false
+  const entries: LoadFromEntry[] = []
+  const errors:  DataLoadError[] = []
+  let inData  = false
+  let inValue = false
 
   for (const line of lines) {
     const t = line.trim()
@@ -220,21 +249,68 @@ function resolveDataLoads(source: string, dir: string): string {
     if (inData && t.startsWith('LOAD FROM')) {
       const match = t.match(/LOAD FROM\s+"([^"]+)"/)
       if (match) {
-        const filePath = resolveFilePath(match[1], dir)
-        const content  = readFileSync(filePath, 'utf-8')
-        const ext      = extname(filePath).toLowerCase()
-        if (ext === '.json') {
-          result.push(...jsonToRclLines(JSON.parse(content) as Record<string, unknown>))
-        } else if (ext === '.csv') {
-          result.push(...csvToRclLines(content, basename(filePath)))
+        const specifier = match[1]
+        let filePath: string
+        try {
+          filePath = resolveFilePath(specifier, dir)
+        } catch {
+          errors.push({
+            directive: t,
+            specifier,
+            code:    'RCL-019',
+            message: `LOAD FROM "${specifier}" — file not found`,
+          })
+          continue
         }
+
+        let content: string
+        try {
+          content = readFileSync(filePath, 'utf-8')
+        } catch {
+          errors.push({
+            directive: t,
+            specifier,
+            code:    'RCL-019',
+            message: `LOAD FROM "${specifier}" — cannot read file: ${filePath}`,
+          })
+          continue
+        }
+
+        const ext = extname(filePath).toLowerCase()
+        let generated: string[]
+        try {
+          if (ext === '.json') {
+            generated = jsonToRclLines(JSON.parse(content) as Record<string, unknown>)
+          } else if (ext === '.csv') {
+            generated = csvToRclLines(content, basename(filePath))
+          } else {
+            errors.push({
+              directive: t,
+              specifier,
+              code:    'RCL-020',
+              message: `LOAD FROM "${specifier}" — unsupported format "${ext}", expected .json or .csv`,
+            })
+            continue
+          }
+        } catch {
+          errors.push({
+            directive: t,
+            specifier,
+            code:    'RCL-020',
+            message: `LOAD FROM "${specifier}" — file is not valid ${ext === '.json' ? 'JSON' : 'CSV'}`,
+          })
+          continue
+        }
+
+        entries.push({ directive: t, file: filePath, ext: ext.slice(1), generated })
+        result.push(...generated)
       }
     } else {
       result.push(line)
     }
   }
 
-  return result.join('\n')
+  return { source: result.join('\n'), entries, errors }
 }
 
 function extractComponentContent(source: string): string[] {
@@ -389,6 +465,117 @@ export async function loadPlugins(sourcePath: string): Promise<void> {
   }
 }
 
+// ─────────────────────────────────────────────────────────
+// INSPECT — show what LOAD FROM generates before compiling
+// Used by: recall check --inspect
+// ─────────────────────────────────────────────────────────
+
+export interface InspectResult {
+  ok:        boolean
+  inputPath: string
+  entries:   LoadFromEntry[]
+  errors:    DataLoadError[]
+}
+
+export function inspect(inputPath: string): InspectResult {
+  const absInput = resolve(inputPath)
+  if (!existsSync(absInput)) {
+    return { ok: false, inputPath: absInput, entries: [], errors: [] }
+  }
+  let source: string
+  try {
+    source = readFileSync(absInput, 'utf-8')
+  } catch {
+    return { ok: false, inputPath: absInput, entries: [], errors: [] }
+  }
+  try {
+    const withTheme      = resolveThemeCopies(source, dirname(absInput))
+    const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
+    const loadResult     = resolveDataLoads(withComponents, dirname(absInput))
+    return {
+      ok:        loadResult.errors.length === 0,
+      inputPath: absInput,
+      entries:   loadResult.entries,
+      errors:    loadResult.errors,
+    }
+  } catch {
+    return { ok: false, inputPath: absInput, entries: [], errors: [] }
+  }
+}
+
+export function formatInspectReport(result: InspectResult): string {
+  const lines: string[] = []
+  const hr = '─'.repeat(60)
+
+  if (result.errors.length > 0) {
+    lines.push('LOAD FROM errors:')
+    for (const err of result.errors) {
+      lines.push(`  [${err.code}] ${err.message}`)
+    }
+    lines.push('')
+  }
+
+  if (result.entries.length === 0 && result.errors.length === 0) {
+    lines.push('No LOAD FROM directives found in this file.')
+    return lines.join('\n')
+  }
+
+  for (const entry of result.entries) {
+    lines.push(`LOAD FROM "${entry.directive.replace(/^LOAD FROM\s+/, '')}"`)
+    lines.push(hr)
+
+    // Parse generated lines to build a readable shape summary
+    let currentSection = ''
+    let currentGroup = ''
+    let currentItem = ''
+
+    for (const line of entry.generated) {
+      const t = line.trim()
+      if (t === 'WORKING-STORAGE SECTION.' || t === 'WORKING-STORAGE SECTION') {
+        currentSection = 'WORKING-STORAGE'
+        lines.push('  WORKING-STORAGE:')
+        continue
+      }
+      if (t === 'ITEMS SECTION.' || t === 'ITEMS SECTION') {
+        currentSection = 'ITEMS'
+        lines.push('  ITEMS:')
+        continue
+      }
+      // Level 01 group (no PIC — has children)
+      const groupMatch = t.match(/^01\s+([A-Z0-9-]+)\.$/)
+      if (groupMatch) {
+        currentGroup = groupMatch[1]
+        currentItem = ''
+        lines.push(`    ${currentGroup}  (group)`)
+        continue
+      }
+      // Level 01 scalar (has PIC)
+      const scalarMatch = t.match(/^01\s+([A-Z0-9-]+)\s+(PIC [^\s]+)\s+VALUE/)
+      if (scalarMatch) {
+        lines.push(`    ${scalarMatch[1].padEnd(28)} ${scalarMatch[2]}`)
+        continue
+      }
+      // Level 05 sub-group item
+      const itemMatch = t.match(/^05\s+([A-Z0-9-]+)\.$/)
+      if (itemMatch) {
+        currentItem = itemMatch[1]
+        lines.push(`      ${currentItem}`)
+        continue
+      }
+      // Level 10 field
+      const fieldMatch = t.match(/^10\s+([A-Z0-9-]+)\s+(PIC [^\s]+)\s+VALUE/)
+      if (fieldMatch) {
+        lines.push(`        ${fieldMatch[1].padEnd(26)} ${fieldMatch[2]}`)
+      }
+    }
+    lines.push('')
+    lines.push(`  ${entry.generated.length} generated line(s) from ${entry.file}`)
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
 export interface CompileOptions {
   strict?: boolean
 }
@@ -412,11 +599,26 @@ export function compile(inputPath: string, outDir?: string, opts: CompileOptions
   }
 
   let program
+  const fileFallback: SourceLocation = { file: absInput, line: 1, col: 1, length: 1, source: '' }
+
   try {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const withData       = resolveDataLoads(withComponents, dirname(absInput))
-    program = parse(withData)
+    const loadResult     = resolveDataLoads(withComponents, dirname(absInput))
+
+    // ── LOAD FROM errors — abort before parse ─────────────
+    if (loadResult.errors.length > 0) {
+      const loadDc = new DiagnosticCollector()
+      for (const err of loadResult.errors) {
+        loadDc.error(err.code, fileFallback, err.message,
+          'Verify the file path is correct relative to the .rcl source file'
+        )
+      }
+      printDiagnostics(loadDc)
+      return { ok: false, inputPath: absInput, error: 'LOAD FROM errors — no output written' }
+    }
+
+    program = parse(loadResult.source)
     resolveIncludes(program, dirname(absInput))
   } catch (err) {
     return { ok: false, inputPath: absInput, error: `PARSE ERROR: ${(err as Error).message}` }
@@ -550,12 +752,35 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
     return { ok: false, inputPath: absInput, errors: [`CANNOT READ FILE: ${(err as Error).message}`] }
   }
 
+  const fileFallback: SourceLocation = { file: absInput, line: 1, col: 1, length: 1, source: '' }
+
   try {
     const withTheme      = resolveThemeCopies(source, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const withData       = resolveDataLoads(withComponents, dirname(absInput))
-    const program        = parse(withData)
-    const dc             = typeCheck(program, absInput, { strict: opts.strict ?? false })
+    const loadResult     = resolveDataLoads(withComponents, dirname(absInput))
+
+    // ── LOAD FROM errors ──────────────────────────────────
+    if (loadResult.errors.length > 0) {
+      const loadDc = new DiagnosticCollector()
+      for (const err of loadResult.errors) {
+        loadDc.error(err.code, fileFallback, err.message,
+          'Verify the file path is correct relative to the .rcl source file'
+        )
+      }
+      if (opts.formatJson) {
+        process.stdout.write(JSON.stringify({ file: absInput, ...loadDc.toJSON() }, null, 2) + '\n')
+      } else {
+        printDiagnostics(loadDc)
+      }
+      return {
+        ok: false,
+        inputPath: absInput,
+        errors: loadResult.errors.map(e => `[${e.code}] ${e.message}`),
+      }
+    }
+
+    const program = parse(loadResult.source)
+    const dc      = typeCheck(program, absInput, { strict: opts.strict ?? false })
 
     if (opts.formatJson) {
       process.stdout.write(JSON.stringify({ file: absInput, ...dc.toJSON() }, null, 2) + '\n')

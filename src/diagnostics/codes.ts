@@ -123,6 +123,18 @@ export const CODES: Record<string, CodeDefinition> = {
     category: 'structural',
     message:  'Circular COPY detected',
   },
+  'RCL-019': {
+    code:     'RCL-019',
+    severity: 'error',
+    category: 'structural',
+    message:  'LOAD FROM file not found',
+  },
+  'RCL-020': {
+    code:     'RCL-020',
+    severity: 'error',
+    category: 'structural',
+    message:  'LOAD FROM file is not valid JSON or CSV',
+  },
 
   // ── Warnings ─────────────────────────────────────────
 

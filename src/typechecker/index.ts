@@ -80,39 +80,44 @@ function dataFieldToSymbol(field: DataField): Symbol {
 // Element type contracts
 // ─────────────────────────────────────────────────────────
 
-type ValueExpectation = 'string' | 'url' | 'group' | 'none' | 'any'
+export type ValueExpectation = 'string' | 'url' | 'group' | 'none' | 'any'
 
-interface ElementContract {
+export interface ElementContract {
   accepts:       ValueExpectation
   requiresUsing: boolean    // must have USING clause
   requiresClick: boolean    // must have ON-CLICK clause
   requiresHref:  boolean    // must have HREF clause
+  description:   string     // one-line description for schema output
 }
 
-const BUILT_IN_ELEMENTS: Record<string, ElementContract> = {
-  'HEADING-1':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'HEADING-2':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'HEADING-3':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'PARAGRAPH':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'LABEL':       { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'CODE-BLOCK':  { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'BANNER':      { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'CALLOUT':     { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false },
-  'BUTTON':      { accepts: 'string', requiresUsing: false, requiresClick: true,  requiresHref: false },
-  'LINK':        { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: true  },
-  'IMAGE':       { accepts: 'url',    requiresUsing: false, requiresClick: false, requiresHref: false },
-  'DIVIDER':     { accepts: 'none',   requiresUsing: false, requiresClick: false, requiresHref: false },
-  'SECTION':     { accepts: 'none',   requiresUsing: false, requiresClick: false, requiresHref: false },
-  'FOOTER':      { accepts: 'any',    requiresUsing: false, requiresClick: false, requiresHref: false },
-  'INPUT':       { accepts: 'none',   requiresUsing: false, requiresClick: false, requiresHref: false },
-  // Group elements — USING clause required
-  'CARD-LIST':   { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false },
-  'NAVIGATION':  { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false },
-  'SIDEBAR-NAV': { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false },
-  'TABS':        { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false },
-  // Group elements — group name via stmt.value OR USING clause (both accepted)
-  'TABLE':       { accepts: 'group',  requiresUsing: false, requiresClick: false, requiresHref: false },
-  'STAT-GRID':   { accepts: 'group',  requiresUsing: false, requiresClick: false, requiresHref: false },
+export const BUILT_IN_ELEMENTS: Record<string, ElementContract> = {
+  // ── Text elements ──────────────────────────────────────
+  'HEADING-1':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Top-level page heading (h1)' },
+  'HEADING-2':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Section heading (h2)' },
+  'HEADING-3':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Sub-section heading (h3)' },
+  'PARAGRAPH':   { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Body text paragraph' },
+  'LABEL':       { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Short inline label or caption' },
+  'CODE-BLOCK':  { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Monospaced code or preformatted text block' },
+  'BANNER':      { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Full-width highlighted banner message' },
+  'CALLOUT':     { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Aside callout box for notes or warnings' },
+  // ── Interactive elements ───────────────────────────────
+  'BUTTON':      { accepts: 'string', requiresUsing: false, requiresClick: true,  requiresHref: false, description: 'Clickable button; requires ON-CLICK clause' },
+  'LINK':        { accepts: 'string', requiresUsing: false, requiresClick: false, requiresHref: true,  description: 'Hyperlink text; requires HREF clause' },
+  'INPUT':       { accepts: 'none',   requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Text input field; no value accepted' },
+  // ── Media elements ─────────────────────────────────────
+  'IMAGE':       { accepts: 'url',    requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Image; value or variable must be PIC URL' },
+  // ── Layout elements ────────────────────────────────────
+  'DIVIDER':     { accepts: 'none',   requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Horizontal rule separator; no value' },
+  'SECTION':     { accepts: 'none',   requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Layout section container; no direct value' },
+  'FOOTER':      { accepts: 'any',    requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Page footer; accepts any value type' },
+  // ── Group elements — USING clause required ─────────────
+  'CARD-LIST':   { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false, description: 'Card grid rendered from a DATA group; USING required' },
+  'NAVIGATION':  { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false, description: 'Top navigation bar from a DATA group; USING required' },
+  'SIDEBAR-NAV': { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false, description: 'Sidebar navigation from a DATA group; USING required' },
+  'TABS':        { accepts: 'group',  requiresUsing: true,  requiresClick: false, requiresHref: false, description: 'Tab interface from a DATA group; USING required' },
+  // ── Group elements — value OR USING clause accepted ────
+  'TABLE':       { accepts: 'group',  requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Data table from a group; pass group name as value or via USING' },
+  'STAT-GRID':   { accepts: 'group',  requiresUsing: false, requiresClick: false, requiresHref: false, description: 'Metric stat grid from a group; pass group name as value or via USING' },
 }
 
 const KNOWN_ELEMENT_NAMES = new Set(Object.keys(BUILT_IN_ELEMENTS))

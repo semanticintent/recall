@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { compileCommand } from './commands/compile.js'
 import { checkCommand } from './commands/check.js'
 import { buildCommand } from './commands/build.js'
+import { schemaCommand } from './commands/schema.js'
 
 const program = new Command()
 
@@ -13,5 +14,6 @@ program
 program.addCommand(compileCommand)
 program.addCommand(checkCommand)
 program.addCommand(buildCommand)
+program.addCommand(schemaCommand)
 
 program.parse()
