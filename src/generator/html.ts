@@ -123,7 +123,7 @@ p { font-family: var(--font-sans); color: var(--muted); max-width: 680px; margin
 p.color-text  { color: var(--text); }
 p.color-accent { color: var(--accent); }
 p code { font-family: var(--font-mono); font-size: 0.85em; color: var(--accent); background: rgba(0,255,65,0.07); padding: 1px 6px; border: 1px solid rgba(0,255,65,0.15); }
-.recall-label { display: inline-block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); font-family: var(--font-mono); margin-bottom: 16px; background: rgba(0,255,65,0.07); padding: 4px 10px; }
+.recall-label { display: inline-block; align-self: flex-start; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); font-family: var(--font-mono); margin-bottom: 16px; background: rgba(0,255,65,0.07); padding: 4px 10px; }
 .recall-btn { display: inline-block; padding: 12px 28px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border: none; transition: opacity 0.2s; }
 .recall-btn.primary  { background: var(--accent); color: var(--bg); }
 .recall-btn.ghost    { background: transparent; border: 1px solid var(--border); color: var(--text); }

@@ -33,6 +33,7 @@ never break the contract between layers.
 | **0.8.1** | **Silent failure elimination + recall-ui v0.1.2** | ✅ Complete |
 | **0.8.2** | **Preprocessor opaqueness fixes (VALUE BLOCK + RECORD in VALUE strings)** | ✅ Complete |
 | **0.8.3** | **Parser: strip \* comments at any indentation; CSS: layout-stack stretch + full-width blocks** | ✅ Complete |
+| **0.8.4** | **CSS: recall-label align-self fix (no stretch in stack layout)** | ✅ Complete |
 | 1.0.0 | Stable language + tighter contracts + first component library | 🟡 Prerequisites met |
 
 ---
