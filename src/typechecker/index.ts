@@ -203,24 +203,37 @@ function checkStructural(
 ): void {
   const fallback = UNKNOWN_LOC(file)
 
-  // PROGRAM-ID present?
-  if (!program.identification.programId || program.identification.programId === 'RECALL-PROGRAM') {
-    // Only warn — RECALL-PROGRAM is the default fallback value
-    dc.warning('RCL-W03', fallback,
-      'PROGRAM-ID not set in IDENTIFICATION DIVISION',
+  // ── RCL-006: PROGRAM-ID required ──────────────────────────
+  if (!program.identification.programIdSet) {
+    dc.error('RCL-006', fallback,
+      'PROGRAM-ID is missing from IDENTIFICATION DIVISION',
       'Add: PROGRAM-ID. MY-PROGRAM.'
     )
   }
 
-  // AUTHOR and DATE-WRITTEN optional but recommended
+  // ── RCL-006: PAGE-TITLE required ──────────────────────────
+  if (!program.identification.pageTitleSet) {
+    dc.error('RCL-006', fallback,
+      'PAGE-TITLE is missing from IDENTIFICATION DIVISION',
+      'Add: PAGE-TITLE. "My Page Title".'
+    )
+  }
+
+  // ── RCL-W03: AUTHOR and DATE-WRITTEN optional but recommended ──
   if (!program.identification.author) {
     dc.warning('RCL-W03', fallback,
       'AUTHOR not set in IDENTIFICATION DIVISION',
       'Add: AUTHOR. Your Name.'
     )
   }
+  if (!program.identification.dateWritten) {
+    dc.warning('RCL-W03', fallback,
+      'DATE-WRITTEN not set in IDENTIFICATION DIVISION',
+      'Add: DATE-WRITTEN. 2026-04-06.'
+    )
+  }
 
-  // PROCEDURE DIVISION must have at least one section
+  // ── RCL-005: PROCEDURE DIVISION must have at least one section ──
   if (program.procedure.sections.length === 0) {
     dc.error('RCL-005', fallback,
       'PROCEDURE DIVISION is empty — no sections defined',
@@ -229,14 +242,11 @@ function checkStructural(
     return
   }
 
-  // STOP RUN — the last statement in the last section should lead to it.
-  // We check by verifying the procedure has any sections at all (parser handles STOP RUN).
-  // A more precise check: ensure the last section is not empty.
-  const lastSection = program.procedure.sections[program.procedure.sections.length - 1]
-  if (lastSection.statements.length === 0) {
-    dc.warning('RCL-W04', toLoc(lastSection.loc, file, fallback),
-      `Section ${lastSection.name} is empty`,
-      'Add DISPLAY statements or remove the section'
+  // ── RCL-013: STOP RUN must be present ─────────────────────
+  if (!program.procedure.hasStopRun) {
+    dc.error('RCL-013', fallback,
+      'STOP RUN. is missing from PROCEDURE DIVISION',
+      'Add STOP RUN. as the final statement of the PROCEDURE DIVISION'
     )
   }
 }
@@ -357,12 +367,16 @@ function checkStatement(
       )
     }
 
-    // ── RCL-002 Value constraint (length) ───────────────
-    if (sym.kind === 'string' && sym.maxLength > 0) {
-      const val = sym.name  // We don't have the actual value at type-check time
-      // Warn if near limit (>90%) — we check VALUE length from the symbol when available
-      // Full value check happens at compile time via safeValue — here we flag the declaration
+    // ── RCL-W05 Implicit coercion — numeric in string context ──
+    if (contract.accepts === 'string' &&
+        (sym.kind === 'numeric' || sym.kind === 'decimal' || sym.kind === 'percent')) {
+      dc.warning('RCL-W05', loc,
+        `${valueName} is declared ${sym.rawPic} (numeric) but ${element} expects a string`,
+        `Declare ${valueName} as PIC X(n) to make the coercion explicit, or use DISPLAY LABEL for numeric display`
+      )
     }
+
+    // ── RCL-002/RCL-W02: value constraint checks run in checkDataValues, not here ──
 
     // ── RCL-009 DATE format ──────────────────────────────
     if (sym.kind === 'date') {
@@ -416,7 +430,7 @@ function checkStatements(
 
 function checkComponents(
   program: ReclProgram,
-  symbols: SymbolTable,
+  _symbols: SymbolTable,
   file:    string,
   dc:      DiagnosticCollector,
 ): void {
@@ -432,15 +446,35 @@ function checkComponents(
         'Add: ACCEPTS PARAM-1 REQUIRED, PARAM-2.'
       )
     }
+
+    // ── RCL-014: component body references undefined component ──
+    function walkComponentBody(stmts: DisplayStatement[]): void {
+      for (const stmt of stmts) {
+        if (!BUILT_IN_ELEMENTS[stmt.element] &&
+            stmt.element !== 'COPY' &&
+            stmt.element !== 'SECTION' &&
+            !definedNames.has(stmt.element)) {
+          dc.error('RCL-014', toLoc(stmt.loc, file, fallback),
+            `Component "${component.name}" references "${stmt.element}" which is not defined in COMPONENT DIVISION`,
+            `Define "${stmt.element}" before using it, or check for a typo`
+          )
+        }
+        walkComponentBody(stmt.children)
+      }
+    }
+    walkComponentBody(component.body.children)
   }
 
-  // Check that REQUIRED parameters are provided at every call site
+  // Check call sites: REQUIRED params provided (RCL-017) + no unknown params (RCL-016)
   function walkForRequiredParams(
     stmts: typeof program.procedure.sections[0]['statements']
   ): void {
     for (const stmt of stmts) {
       if (definedNames.has(stmt.element)) {
         const def = program.component.components.find(c => c.name === stmt.element)!
+        const acceptedNames = new Set(def.accepts.map(a => a.name))
+
+        // ── RCL-017: required param missing ───────────────────
         const required = def.accepts.filter(a => a.required)
         for (const param of required) {
           const provided =
@@ -450,8 +484,23 @@ function checkComponents(
           if (!provided) {
             dc.error('RCL-017', toLoc(stmt.loc, file, fallback),
               `${stmt.element} is missing required parameter "${param.name}"`,
-              `Add: WITH ${param.name} <value>`
+              `Add: WITH ${param.name} <value>  or include it in WITH DATA`
             )
+          }
+        }
+
+        // ── RCL-016: unknown param passed ─────────────────────
+        // Check WITH DATA names against accepted names
+        const dataClause = stmt.clauses.find(c => c.key === 'DATA')
+        if (dataClause && acceptedNames.size > 0) {
+          const passed = dataClause.value.split(',').map(s => s.trim()).filter(Boolean)
+          for (const name of passed) {
+            if (!acceptedNames.has(name)) {
+              dc.error('RCL-016', toLoc(stmt.loc, file, fallback),
+                `${stmt.element} does not declare an ACCEPTS parameter named "${name}"`,
+                `Declared ACCEPTS: ${[...acceptedNames].join(', ')}. Check for typos or update the component definition.`
+              )
+            }
           }
         }
       }

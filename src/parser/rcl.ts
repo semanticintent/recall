@@ -37,6 +37,8 @@ export interface IdentificationDivision {
   description?: string
   favicon?: string
   language?: string
+  programIdSet: boolean   // false when RECALL-PROGRAM default was applied
+  pageTitleSet: boolean   // false when "RECALL Page" default was applied
 }
 
 export interface EnvironmentDivision {
@@ -113,7 +115,8 @@ export interface ProcedureSection {
 }
 
 export interface ProcedureDivision {
-  sections: ProcedureSection[]
+  sections:   ProcedureSection[]
+  hasStopRun: boolean   // true when STOP RUN. was present in source
 }
 
 // ─────────────────────────────────────────────────────────
@@ -225,12 +228,14 @@ function parseIdentification(lines: LineEntry[]): IdentificationDivision {
     if (kw === 'FAVICON.')      result.favicon      = val
   }
   return {
-    programId:   result.programId   ?? 'RECALL-PROGRAM',
-    pageTitle:   result.pageTitle   ?? 'RECALL Page',
-    author:      result.author,
-    dateWritten: result.dateWritten,
-    description: result.description,
-    favicon:     result.favicon,
+    programId:    result.programId   ?? 'RECALL-PROGRAM',
+    pageTitle:    result.pageTitle   ?? 'RECALL Page',
+    author:       result.author,
+    dateWritten:  result.dateWritten,
+    description:  result.description,
+    favicon:      result.favicon,
+    programIdSet: result.programId   !== undefined,
+    pageTitleSet: result.pageTitle   !== undefined,
   }
 }
 
@@ -472,9 +477,11 @@ function parseProcedure(lines: LineEntry[]): ProcedureDivision {
   let current: ProcedureSection | null = null
   const sectionStack: DisplayStatement[] = []
   const joined = joinContinuationLines(lines)
+  let hasStopRun = false
 
   for (const { text, lineNum, source } of joined) {
-    if (!text || text === 'STOP RUN.') continue
+    if (!text) continue
+    if (text === 'STOP RUN.' || text === 'STOP RUN') { hasStopRun = true; continue }
 
     // Section header: single word ending with .
     if (!text.startsWith('DISPLAY') && text.endsWith('.') && !text.startsWith('STOP') && !text.includes(' ')) {
@@ -529,7 +536,7 @@ function parseProcedure(lines: LineEntry[]): ProcedureDivision {
     }
   }
 
-  return { sections }
+  return { sections, hasStopRun }
 }
 
 function parseComponentDivision(lines: LineEntry[]): ComponentDivision {

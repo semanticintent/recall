@@ -520,7 +520,7 @@ function extractComponentContent(source: string): string[] {
   return result
 }
 
-function resolveComponentCopies(source: string, dir: string): string {
+function resolveComponentCopies(source: string, dir: string, seen: Set<string> = new Set()): string {
   const lines = source.split('\n')
   const result: string[] = []
   let inComponent = false
@@ -544,9 +544,14 @@ function resolveComponentCopies(source: string, dir: string): string {
     if (inComponent && t.startsWith('COPY FROM')) {
       const match = t.match(/COPY FROM\s+"([^"]+)"/)
       if (match) {
-        const filePath = resolveFilePath(match[1], dir)
+        const filePath = resolve(resolveFilePath(match[1], dir))
+        // ── RCL-018: circular COPY detection ────────────────
+        if (seen.has(filePath)) {
+          throw new Error(`[RCL-018] Circular COPY detected: "${match[1]}" is already being included`)
+        }
+        const nextSeen = new Set(seen).add(filePath)
         const copySource = readFileSync(filePath, 'utf-8')
-        result.push(...extractComponentContent(copySource))
+        result.push(...extractComponentContent(resolveComponentCopies(copySource, dirname(filePath), nextSeen)))
       }
     } else {
       result.push(line)
@@ -556,7 +561,7 @@ function resolveComponentCopies(source: string, dir: string): string {
   return result.join('\n')
 }
 
-function resolveThemeCopies(source: string, dir: string): string {
+function resolveThemeCopies(source: string, dir: string, seen: Set<string> = new Set()): string {
   const lines = source.split('\n')
   const result: string[] = []
   let inEnv   = false
@@ -580,9 +585,14 @@ function resolveThemeCopies(source: string, dir: string): string {
     if (inEnv && t.startsWith('COPY FROM')) {
       const match = t.match(/COPY FROM\s+"([^"]+)"/)
       if (match) {
-        const filePath = resolveFilePath(match[1], dir)
+        const filePath = resolve(resolveFilePath(match[1], dir))
+        // ── RCL-018: circular COPY detection ────────────────
+        if (seen.has(filePath)) {
+          throw new Error(`[RCL-018] Circular COPY detected: "${match[1]}" is already being included`)
+        }
+        const nextSeen = new Set(seen).add(filePath)
         const themeSource = readFileSync(filePath, 'utf-8')
-        result.push(...extractEnvContent(themeSource))
+        result.push(...extractEnvContent(resolveThemeCopies(themeSource, dirname(filePath), nextSeen)))
       }
     } else {
       result.push(line)
@@ -1099,6 +1109,40 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
       warnings:  dc.hasWarnings(),
     }
   } catch (err) {
-    return { ok: false, inputPath: absInput, errors: [`PARSE ERROR: ${(err as Error).message}`] }
+    const msg = (err as Error).message ?? String(err)
+    // ── RCL-018: circular COPY ──────────────────────────────────────────────────
+    if (msg.startsWith('[RCL-018]')) {
+      const copyDc = new DiagnosticCollector()
+      copyDc.error('RCL-018', fileFallback,
+        msg.replace('[RCL-018] ', ''),
+        'Break the cycle: ensure no .rcpy file directly or indirectly includes itself'
+      )
+      if (!opts.quiet) {
+        if (opts.formatJson) {
+          process.stdout.write(JSON.stringify({ file: absInput, ...copyDc.toJSON() }, null, 2) + '\n')
+        } else {
+          printDiagnostics(copyDc)
+        }
+      }
+      return { ok: false, inputPath: absInput, errors: [msg] }
+    }
+    // ── RCL-015: COPY FROM path unresolvable — convert to structured diagnostic ──
+    const isCopyError = /cannot resolve package path|ENOENT|no such file/i.test(msg)
+    if (isCopyError) {
+      const copyDc = new DiagnosticCollector()
+      copyDc.error('RCL-015', fileFallback,
+        `COPY FROM path could not be resolved: ${msg}`,
+        'Check that the path is correct relative to the .rcl source file, or that the npm package is installed'
+      )
+      if (!opts.quiet) {
+        if (opts.formatJson) {
+          process.stdout.write(JSON.stringify({ file: absInput, ...copyDc.toJSON() }, null, 2) + '\n')
+        } else {
+          printDiagnostics(copyDc)
+        }
+      }
+      return { ok: false, inputPath: absInput, errors: [`[RCL-015] ${msg}`] }
+    }
+    return { ok: false, inputPath: absInput, errors: [`PARSE ERROR: ${msg}`] }
   }
 }
