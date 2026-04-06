@@ -455,6 +455,7 @@ function joinContinuationLines(lines: LineEntry[]): JoinedLine[] {
       line.startsWith('COPY FROM') ||
       line.startsWith('DEFINE ') ||
       line.startsWith('END DEFINE') ||
+      line.startsWith('END SECTION') ||
       line.startsWith('ACCEPTS ') ||
       (!line.includes(' ') && line.endsWith('.')) // section header
 
@@ -495,7 +496,7 @@ function parseProcedure(lines: LineEntry[]): ProcedureDivision {
       }
     }
 
-    if (text === 'STOP SECTION.') {
+    if (text === 'STOP SECTION.' || text.startsWith('END SECTION')) {
       sectionStack.pop()
       continue
     }

@@ -13,6 +13,7 @@ export class DiagnosticCollector {
 
   add(
     code:     string,
+    severity: DiagnosticSeverity,
     location: SourceLocation,
     why:      string,
     hint?:    string,
@@ -20,7 +21,7 @@ export class DiagnosticCollector {
     const def = getCode(code)
     this.items.push({
       code:     def.code,
-      severity: def.severity,
+      severity,
       category: def.category,
       location,
       message:  def.message,
@@ -30,11 +31,11 @@ export class DiagnosticCollector {
   }
 
   error(code: string, location: SourceLocation, why: string, hint?: string): void {
-    this.add(code, location, why, hint)
+    this.add(code, 'error', location, why, hint)
   }
 
   warning(code: string, location: SourceLocation, why: string, hint?: string): void {
-    this.add(code, location, why, hint)
+    this.add(code, 'warning', location, why, hint)
   }
 
   hasErrors(): boolean {

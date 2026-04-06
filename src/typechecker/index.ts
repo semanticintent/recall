@@ -267,8 +267,37 @@ function checkStatement(
   const loc = toLoc(stmt.loc, file, fallback)
   const element = stmt.element
 
-  // Skip COPY and SECTION — not type-checked at element level
-  if (element === 'COPY' || element === 'SECTION') {
+  // Skip COPY — not type-checked at element level
+  if (element === 'COPY') {
+    for (const child of stmt.children) {
+      checkStatement(child, symbols, file, hasPlugins, componentNames, dc)
+    }
+    return
+  }
+
+  // SECTION — check LAYOUT SPLIT child shape, then recurse and return
+  if (element === 'SECTION') {
+    // ── RCL-008 LAYOUT SPLIT child shape ──────────────────
+    const layoutClause = stmt.clauses.find(c => c.key === 'LAYOUT')
+    if (layoutClause?.value?.toUpperCase() === 'SPLIT') {
+      const childSections = stmt.children.filter(c => c.element === 'SECTION')
+      if (childSections.length === 0) {
+        dc.error('RCL-008', loc,
+          'LAYOUT SPLIT has no child SECTION elements — both columns will be empty',
+          'Add two child SECTION blocks: one for the left column, one for the right'
+        )
+      } else if (childSections.length === 1) {
+        dc.warning('RCL-008', loc,
+          'LAYOUT SPLIT has only one child SECTION — the right column will be empty',
+          'Add a second child SECTION for the right column'
+        )
+      } else if (childSections.length > 2) {
+        dc.warning('RCL-008', loc,
+          `LAYOUT SPLIT has ${childSections.length} child SECTIONs — only the first two are rendered, the rest are silently dropped`,
+          'Remove extra child SECTIONs or switch to LAYOUT GRID'
+        )
+      }
+    }
     for (const child of stmt.children) {
       checkStatement(child, symbols, file, hasPlugins, componentNames, dc)
     }
