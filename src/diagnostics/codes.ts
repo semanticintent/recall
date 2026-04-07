@@ -318,6 +318,28 @@ export const CODES: Record<string, CodeDefinition> = {
     seeAlso:     [],
   },
 
+  'RCL-W07': {
+    code:        'RCL-W07',
+    severity:    'warning',
+    category:    'syntax',
+    message:     'Unknown PIC type — defaulted to PIC X',
+    description: 'A DATA field declaration uses a PIC type not recognised by the compiler. The field is treated as PIC X (unbounded string) and compilation continues.',
+    example:     '01 MY-FIELD PIC CUSTOM VALUE "hello".   ← CUSTOM is not a valid PIC type',
+    fix:         'Use a valid PIC type: X, X(n), 9, 9(n), DATE, URL, PCT, or BOOL.',
+    seeAlso:     ['RCL-001'],
+  },
+
+  'RCL-W08': {
+    code:        'RCL-W08',
+    severity:    'warning',
+    category:    'syntax',
+    message:     'Malformed VALUE clause — treated as empty',
+    description: 'A VALUE clause was present but did not contain a valid quoted string. The field value is treated as empty and compilation continues.',
+    example:     '01 MY-FIELD PIC X VALUE hello.   ← value must be quoted',
+    fix:         'Wrap the value in double quotes: VALUE "hello".',
+    seeAlso:     ['RCL-W06'],
+  },
+
   'RCL-W06': {
     code:        'RCL-W06',
     severity:    'warning',

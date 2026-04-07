@@ -192,18 +192,49 @@ function extractString(token: string): string {
   return token
 }
 
-function parsePicValue(tokens: string[]): { pic: string; value: string; valueSet: boolean; comment?: string } {
+const KNOWN_PIC_TYPES = /^(X|X\(\d+\)|9|9\(\d+\)|9\(\d+\)V9\(\d+\)|DATE|URL|PCT|BOOL)$/
+
+function parsePicValue(
+  tokens:   string[],
+  lineNum:  number,
+  raw:      string,
+  warnings: ParseWarning[],
+): { pic: string; value: string; valueSet: boolean; comment?: string } {
   // e.g. PIC X(60) VALUE "hello" COMMENT "intent note"
   const picIdx     = tokens.indexOf('PIC')
   const valueIdx   = tokens.indexOf('VALUE')
   const commentIdx = tokens.indexOf('COMMENT')
-  const pic = picIdx >= 0 && picIdx + 1 < tokens.length ? tokens[picIdx + 1] : 'X'
+  let pic = picIdx >= 0 && picIdx + 1 < tokens.length ? tokens[picIdx + 1] : 'X'
+
+  // RCL-W07: unknown PIC type — default to X and warn
+  if (picIdx >= 0 && pic && !KNOWN_PIC_TYPES.test(pic.toUpperCase())) {
+    warnings.push({
+      code:    'RCL-W07',
+      message: `Unknown PIC type "${pic}" — defaulted to PIC X`,
+      hint:    `Valid types: X, X(n), 9, 9(n), DATE, URL, PCT, BOOL`,
+      loc:     makeLoc(lineNum, raw, pic),
+    })
+    pic = 'X'
+  }
 
   // VALUE ends at COMMENT (if present), otherwise takes the rest
   const valueEnd = commentIdx >= 0 ? commentIdx : tokens.length
-  const value = valueIdx >= 0 && valueIdx + 1 < valueEnd
-    ? extractString(tokens.slice(valueIdx + 1, valueEnd).join(' '))
-    : ''
+  let value = ''
+  if (valueIdx >= 0 && valueIdx + 1 < valueEnd) {
+    const raw_value = tokens.slice(valueIdx + 1, valueEnd).join(' ')
+    // RCL-W08: VALUE present but no quoted string found
+    if (raw_value && !raw_value.includes('"') && !raw_value.includes("'")) {
+      warnings.push({
+        code:    'RCL-W08',
+        message: `Malformed VALUE clause — expected a quoted string, got "${raw_value}"`,
+        hint:    `Wrap the value in quotes: VALUE "${raw_value}"`,
+        loc:     makeLoc(lineNum, raw, raw_value),
+      })
+      value = ''
+    } else {
+      value = extractString(raw_value)
+    }
+  }
 
   const comment = commentIdx >= 0 && commentIdx + 1 < tokens.length
     ? extractString(tokens.slice(commentIdx + 1).join(' '))
@@ -307,7 +338,7 @@ function parseEnvironment(lines: LineEntry[]): EnvironmentDivision {
     // Palette: COLOR-ACCENT #... (shorthand) or 01 COLOR-ACCENT PIC X(7) VALUE "#..."
     if (kw === '01') {
       const name = tokens[1]
-      const { value } = parsePicValue(tokens.slice(2))
+      const { value } = parsePicValue(tokens.slice(2), lineNum, raw, [])
       if (name && value) result.palette![name] = value
     } else if (/^COLOR-/.test(kw)) {
       if (kw.endsWith('.')) {
@@ -340,16 +371,16 @@ function parseEnvironment(lines: LineEntry[]): EnvironmentDivision {
   }
 }
 
-function parseDataField(tokens: string[], lineNum: number, raw: string): DataField {
+function parseDataField(tokens: string[], lineNum: number, raw: string, warnings: ParseWarning[]): DataField {
   const level = parseInt(tokens[0], 10) as DataLevel
   const name = tokens[1]
   const rest = tokens.slice(2)
-  const { pic, value, comment, valueSet } = parsePicValue(rest)
+  const { pic, value, comment, valueSet } = parsePicValue(rest, lineNum, raw, warnings)
   const loc = makeLoc(lineNum, raw, name)
   return { level, name, pic, value, valueSet, comment, children: [], loc }
 }
 
-function parseData(lines: LineEntry[]): DataDivision {
+function parseData(lines: LineEntry[], warnings: ParseWarning[]): DataDivision {
   const workingStorage: DataField[] = []
   const items: DataField[] = []
   let section: 'WORKING-STORAGE' | 'ITEMS' | null = null
@@ -366,7 +397,7 @@ function parseData(lines: LineEntry[]): DataDivision {
     const level = parseInt(tokens[0], 10)
     if (isNaN(level)) continue
 
-    const field = parseDataField(tokens, lineNum, raw)
+    const field = parseDataField(tokens, lineNum, raw, warnings)
     const target = section === 'WORKING-STORAGE' ? workingStorage : items
 
     if (level === 1) {
@@ -678,12 +709,14 @@ export function parse(source: string): ReclProgram {
     if (currentDivision) buckets[currentDivision].push({ raw, lineNum })
   }
 
-  const { division: procedure, warnings: parseWarnings } = parseProcedure(buckets.PROCEDURE)
+  const parseWarnings: ParseWarning[] = []
+  const { division: procedure, warnings: procWarnings } = parseProcedure(buckets.PROCEDURE)
+  parseWarnings.push(...procWarnings)
 
   return {
     identification: parseIdentification(buckets.IDENTIFICATION),
     environment:    parseEnvironment(buckets.ENVIRONMENT),
-    data:           parseData(buckets.DATA),
+    data:           parseData(buckets.DATA, parseWarnings),
     component:      parseComponentDivision(buckets.COMPONENT),
     procedure,
     parseWarnings,
