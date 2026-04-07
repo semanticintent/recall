@@ -1,9 +1,9 @@
 # RECALL Compiler Hardening Spec
 ## Four Lessons from COBOL — Applied to an AI-First Compiler
 
-> Version: 0.1 — Draft  
-> Status: Pre-implementation  
-> Context: Prerequisite work before WITH INTENT ships. The AI compositor contract requires a compiler that catches everything it can catch. These four items close the known gaps.
+> Version: 0.2 — Scoped for implementation  
+> Status: RCL-023 and RCL-W06 ready to implement. DATA COPY deferred (separate session).  
+> Context: Prerequisite work before WITH INTENT ships. The AI compositor contract requires a compiler that catches everything it can catch.
 
 ---
 
@@ -15,30 +15,51 @@ An AI compositor has no implicit knowledge. It operates strictly on what is form
 
 The WITH INTENT contract is: *the AI composites within the language, the compiler validates the output.* That contract is only as strong as the compiler's ability to catch everything that can go wrong. Every silent failure is a hole in the contract.
 
-These four items close the known holes.
+---
+
+## Status Overview
+
+| Item | Code | Status | Notes |
+|---|---|---|---|
+| Missing terminator | `RCL-023` | **TODO** | Next session — small, self-contained |
+| Uninitialised field | `RCL-W06` | **TODO** | Next session — new typechecker pass |
+| PIC size overflow | `RCL-002` / `RCL-W02` | **DONE** | Already fully implemented in `checkDataValues` |
+| DATA COPY clause | `RCL-024/025/026` | **DEFERRED** | Large feature — separate focused session |
 
 ---
 
-## Item 1 — RCL-005: Missing Statement Terminator
+## Item 1 — RCL-023: Missing Statement Terminator
 
 ### The COBOL lesson
-COBOL's dot terminated entire logical blocks — a misplaced or missing dot silently restructured program logic with no warning. The most hated punctuation in programming history.
+COBOL's dot terminated entire logical blocks — a misplaced or missing dot silently restructured program logic with no warning.
 
 ### RECALL's current state
-RECALL statements are single-line by design, so dot cannot collapse nested scope. The structural danger does not exist. However: if a `.` is missing, the parser currently silently skips or misparsed the statement. No diagnostic is emitted.
+RECALL statements are single-line by design so dot cannot collapse nested scope. However: if a `.` is missing on a DISPLAY statement, the parser currently processes it silently with no diagnostic emitted.
 
-### Spec
+### Where to implement
+**File:** `src/parser/rcl.ts`  
+**Function:** `parseProcedure()` — lines 491–556  
+**Approach:** In `joinContinuationLines`, the raw line text is available before `.` stripping. Check each DISPLAY/STOP-RUN line for a terminating `.` before `replace(/\.$/, '')` strips it. If absent, record the location for a diagnostic.
 
-**Diagnostic code:** `RCL-005`  
+Currently `joinContinuationLines` strips the dot silently:
+```typescript
+const tokens = text.replace(/\.$/, '').split(/\s+/)
+```
+
+**The challenge:** the parser does not currently return diagnostics — it only returns an AST. Terminator errors need to surface through the typechecker or a new parser-level diagnostic channel.
+
+**Recommended approach:** add an optional `parseWarnings: ParseWarning[]` array to `ReclProgram` (populated by the parser), then have the typechecker drain it into the `DiagnosticCollector` at the start of `typeCheck()`. This keeps the parser pure (no DC dependency) while surfacing parse-level issues.
+
+### Diagnostic spec
+
+**Code:** `RCL-023`  
 **Name:** `missing-terminator`  
 **Severity:** error  
 **Category:** syntax
 
-**Trigger condition:** a statement line in PROCEDURE DIVISION is parsed but no `.` is found before the next newline or end of input.
-
 **Error output (text):**
 ```
-ERROR [RCL-005] missing-terminator — program.rcl:14:32
+ERROR [RCL-023] missing-terminator — program.rcl:14:29
   DISPLAY HEADING-1 PAGE-TITLE
                                ^
   Statement has no terminator
@@ -48,267 +69,207 @@ ERROR [RCL-005] missing-terminator — program.rcl:14:32
 **Error output (JSON):**
 ```json
 {
-  "code": "RCL-005",
+  "code": "RCL-023",
   "severity": "error",
   "category": "syntax",
   "line": 14,
-  "col": 32,
+  "col": 29,
   "message": "Statement has no terminator",
-  "hint": "Every RECALL statement must end with a period (.)"
+  "hint": "Every RECALL statement ends with a full stop (.)"
 }
 ```
 
-**`recall explain RCL-005` output:**
+**`recall explain RCL-023`:**
 ```
-RCL-005 — missing-terminator
+RCL-023 — missing-terminator
 Category: syntax
 Severity: error
 Message:  A PROCEDURE DIVISION statement was found without a terminating period.
 Hint:     Every RECALL statement ends with a full stop. Add . at the end of the line.
 ```
 
-### Implementation notes
-- Parser should check for `.` as the last non-whitespace character on each PROCEDURE DIVISION statement line
-- Lines that are continuations (part of multi-line VALUE strings in DATA DIVISION) are exempt
-- Comment lines (`*`) are exempt
-- Division/section headers are exempt
+### Exemptions
+- Comment lines (`*`) — exempt
+- Division/section headers — exempt (they end in `.` by design, parser already handles)
+- Blank lines — exempt
+- Multi-line VALUE strings in DATA DIVISION — exempt (tracked via `inValueString` flag already in parser)
+
+### codes.ts entry to add
+```typescript
+'RCL-023': {
+  code:        'RCL-023',
+  severity:    'error',
+  category:    'syntax',
+  message:     'Statement has no terminator',
+  description: 'A PROCEDURE DIVISION statement does not end with a period. Every RECALL statement must be terminated with a full stop.',
+  example:     'DISPLAY HEADING-1 PAGE-TITLE   ← missing period',
+  fix:         'Add a period at the end of the statement: DISPLAY HEADING-1 PAGE-TITLE.',
+  seeAlso:     [],
+},
+```
 
 ---
 
-## Item 2 — RCL-006: Uninitialised Field
+## Item 2 — RCL-W06: Uninitialised Field
 
 ### The COBOL lesson
-COBOL did not require fields to have initial values. Uninitialised WORKING-STORAGE fields contained garbage memory. Programs ran, produced wrong output, and nobody knew why.
+COBOL fields without initial values contained garbage memory. Programs produced wrong output with no warning. Silent, untraceable.
 
 ### RECALL's current state
-A field declared without a `VALUE` clause renders empty silently. The AI compositor may declare fields without values, see no error, and produce blank output with no diagnostic signal.
+A field declared without a `VALUE` clause renders empty silently. An AI compositor may declare fields without values, see no error, and produce blank output with no diagnostic signal.
 
-### Spec
+### Where to implement
+**File:** `src/typechecker/index.ts`  
+**New pass:** `checkUninitialisedFields()` — add after `checkDataValues()` in the `typeCheck()` function  
+**Approach:**  
+1. Walk all PROCEDURE DIVISION statements and collect every field name referenced (as `stmt.value` or in USING/WITH DATA clauses) into a `referencedNames: Set<string>`
+2. Walk all DATA DIVISION fields — if `field.value === ''` AND the field name is in `referencedNames`, emit `RCL-W06`
+3. Fields not referenced in PROCEDURE DIVISION do not warn (avoids noise from DATA templates)
 
-**Diagnostic code:** `RCL-006`  
+### Key distinction — explicit empty vs missing
+- `VALUE ""` — explicit empty, intentional, **no warning**
+- `VALUE " "` — explicit space, intentional, **no warning**  
+- No VALUE clause at all → parsed as `value: ''` in `DataField` — **warn**
+
+**Problem:** the parser currently cannot distinguish "VALUE was declared as empty string" from "VALUE was never declared". Both result in `field.value === ''`.
+
+**Fix needed in parser first:** add `valueSet: boolean` to `DataField` interface (true if VALUE clause was present, regardless of its content). Set it in `parsePicValue()`.
+
+```typescript
+// In src/parser/rcl.ts — DataField interface
+export interface DataField {
+  level:    DataLevel
+  name:     string
+  pic:      string
+  value:    string
+  valueSet: boolean   // ← ADD: true if VALUE clause was present
+  comment?: string
+  children: DataField[]
+  loc?:     NodeLocation
+}
+```
+
+```typescript
+// In parsePicValue() — return valueSet flag
+return { pic, value, comment, valueSet: valueIdx >= 0 }
+```
+
+### Diagnostic spec
+
+**Code:** `RCL-W06`  
 **Name:** `uninitialised-field`  
 **Severity:** warning  
 **Category:** data
 
-**Trigger condition:** a field in DATA DIVISION is declared without a `VALUE` clause AND that field is referenced in PROCEDURE DIVISION.
-
 **Warning output (text):**
 ```
-WARNING [RCL-006] uninitialised-field — program.rcl:8:4
+WARNING [RCL-W06] uninitialised-field — program.rcl:8:4
   01 PAGE-SUBTITLE PIC X.
      ^^^^^^^^^^^^
-  Field referenced in PROCEDURE DIVISION has no VALUE
+  Field referenced in PROCEDURE DIVISION has no VALUE clause
   Hint: add VALUE "..." or VALUE "" to declare intent explicitly
 ```
 
 **Warning output (JSON):**
 ```json
 {
-  "code": "RCL-006",
+  "code": "RCL-W06",
   "severity": "warning",
   "category": "data",
   "line": 8,
   "col": 4,
   "message": "Field referenced in PROCEDURE DIVISION has no VALUE clause",
-  "hint": "Add VALUE \"...\" to declare intent explicitly, or VALUE \"\" for intentional empty"
+  "hint": "Add VALUE \"...\" to set a value, or VALUE \"\" for intentional empty"
 }
 ```
 
-**`recall explain RCL-006` output:**
+**`recall explain RCL-W06`:**
 ```
-RCL-006 — uninitialised-field
+RCL-W06 — uninitialised-field
 Category: data
 Severity: warning
 Message:  A field is referenced in PROCEDURE DIVISION but has no VALUE clause in DATA DIVISION.
-Hint:     Add VALUE "..." to set a value, or VALUE "" to explicitly declare an empty field.
+          The field will render empty. This may be intentional but is ambiguous.
+Hint:     Add VALUE "..." to set a value. Use VALUE "" to explicitly declare an empty field.
           This distinction matters for AI compositors — an explicit empty is intentional;
           a missing VALUE is ambiguous.
 ```
 
-### Design decision — warning not error
-A field with no VALUE may be intentional (placeholder, dynamic population planned). Severity is warning so the program still compiles and the human/AI gets signal without a hard block. A future `--strict-data` flag could elevate this to error.
-
-### Implementation notes
-- Only trigger if the field is actually referenced in PROCEDURE DIVISION — unused fields do not warn (avoids noise from shared DATA templates)
-- `VALUE ""` is treated as explicit empty — no warning
-- `VALUE " "` (space) is treated as explicit — no warning
-- Groups (items with sub-items) are exempt if all sub-items have VALUES
+### codes.ts entry to add
+```typescript
+'RCL-W06': {
+  code:        'RCL-W06',
+  severity:    'warning',
+  category:    'data',
+  message:     'Field has no VALUE clause',
+  description: 'A field is referenced in PROCEDURE DIVISION but was declared without a VALUE clause. The field renders empty. For AI compositor clarity, every referenced field should have an explicit VALUE.',
+  example:     '01 PAGE-SUBTITLE PIC X.\nDISPLAY PARAGRAPH PAGE-SUBTITLE.   ← no VALUE declared',
+  fix:         'Add VALUE "..." to the field declaration, or VALUE "" to explicitly declare an intentional empty.',
+  seeAlso:     ['RCL-006'],
+},
+```
 
 ---
 
-## Item 3 — RCL-007: PIC Size Overflow
+## Item 3 — PIC Size Overflow (DONE)
 
-### The COBOL lesson
-COBOL silently truncated values that exceeded their declared PIC size. A value of 12 characters moved into a `PIC X(10)` field lost its last two characters with no warning. Wrong data in production, untraceable.
+Already fully implemented as `RCL-002` (error — value exceeds declared length) and `RCL-W02` (warning — value near limit) in `checkDataValues()` in `src/typechecker/index.ts` lines 576–587.
 
-### RECALL's current state
-A VALUE longer than its declared PIC size is accepted and silently truncated at render time. No diagnostic is emitted.
-
-### Spec
-
-**Diagnostic code:** `RCL-007`  
-**Name:** `pic-overflow`  
-**Severity:** warning  
-**Category:** data
-
-**Trigger condition:** the string length of a VALUE literal exceeds the declared size in a `PIC X(n)` clause.
-
-**Warning output (text):**
-```
-WARNING [RCL-007] pic-overflow — program.rcl:6:4
-  01 SHORT-TITLE PIC X(10) VALUE "This title is too long".
-                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  VALUE length 22 exceeds PIC X(10) — will truncate to "This title"
-  Hint: increase PIC size or shorten the value
-```
-
-**Warning output (JSON):**
-```json
-{
-  "code": "RCL-007",
-  "severity": "warning",
-  "category": "data",
-  "line": 6,
-  "col": 4,
-  "message": "VALUE length 22 exceeds declared PIC X(10) — value will be truncated",
-  "declared_size": 10,
-  "actual_length": 22,
-  "truncated_value": "This title",
-  "hint": "Increase PIC size to PIC X(22) or shorten the value"
-}
-```
-
-**`recall explain RCL-007` output:**
-```
-RCL-007 — pic-overflow
-Category: data
-Severity: warning
-Message:  A VALUE literal is longer than the field's declared PIC size.
-          The value will be silently truncated at compile time.
-Hint:     Either increase the PIC size to match the actual value length,
-          or shorten the value. Use recall check --inspect to see resolved values.
-```
-
-### Design decision — warning not error
-Truncation may be intentional (deliberately capping display length). Warning gives signal without blocking. A future `--strict-data` flag could elevate to error.
-
-### Special case — PIC X (no size)
-`PIC X` without a size declaration is treated as unbounded — no overflow warning is emitted. This is intentional: `PIC X` in RECALL means "any text of any length" and is the common case for most content fields.
-
-### Implementation notes
-- Only applies to `PIC X(n)` with explicit size
-- `PIC 9(n)` overflow (numeric): same pattern, same code — numeric value exceeds digit count
-- Multi-line VALUE strings: measure total resolved length after line joining
-- Does not apply to `PIC DATE`, `PIC URL`, `PIC BOOL` — those have type validation, not size validation
+No work needed.
 
 ---
 
-## Item 4 — COPY Clause with Closed Symbol Resolution
+## Item 4 — DATA COPY Clause (DEFERRED)
 
-### The COBOL lesson
-COBOL COPY brought shared field definitions into a program. Over time, thousands of copybooks proliferated across systems, versions diverged, nobody knew which was authoritative. Change one copybook — everything that copied it broke. Finding what copied it was manual archaeology.
+### Why deferred
+COPY is a new parser feature requiring file I/O during parsing, a recursive resolver, circular dependency detection, and symbol table merging. It's a self-contained architectural addition that warrants its own focused session rather than being bolted onto the RCL-023/W06 implementation.
 
-### RECALL's current state
-No module or import system exists. Each `.rcl` file is fully self-contained. Safe for single-file programs but as programs grow, DATA definitions will be copy-pasted between files — which is exactly how copybook hell begins.
+### When to revisit
+Before WITH INTENT implementation. WITH INTENT requires a *closed* symbol table — COPY resolution must be complete before the AI compositor sees the DATA DIVISION. This is the last prerequisite before WITH INTENT can be fully implemented.
 
-### Spec
-
-**New clause:** `COPY <name> FROM "<path>"`  
-**Location:** DATA DIVISION, after or instead of inline field declarations  
-**Scope:** imports all `01`-level field declarations from the target file's DATA DIVISION into the current program's symbol table
-
-**Syntax:**
-```cobol
-DATA DIVISION.
-   COPY CUSTOMER-FIELDS FROM "shared/customer.rcl".
-   COPY SITE-CONFIG FROM "shared/config.rcl".
-
-   01 PAGE-TITLE PIC X VALUE "Welcome".
-```
-
-**Resolution rules:**
-1. Path is relative to the source file's directory
-2. The compiler resolves all COPY references before building the symbol table — no lazy resolution
-3. Circular COPY references are a hard error (`RCL-008 circular-copy`)
-4. A field name that exists in both a COPY source and the local DATA DIVISION is a hard error (`RCL-009 duplicate-field`) — no silent override
-5. COPY targets must be valid `.rcl` files — referencing a non-existent file is `RCL-010 unresolved-copy`
-
-**New diagnostic codes:**
-
-| Code | Name | Severity |
-|---|---|---|
-| `RCL-008` | `circular-copy` | error |
-| `RCL-009` | `duplicate-field` | error |
-| `RCL-010` | `unresolved-copy` | error |
-
-**RCL-008 output:**
-```
-ERROR [RCL-008] circular-copy — program.rcl:5:4
-  COPY BASE FROM "shared/base.rcl"
-  Circular reference detected: program.rcl → base.rcl → program.rcl
-```
-
-**RCL-009 output:**
-```
-ERROR [RCL-009] duplicate-field — program.rcl:12:4
-  01 PAGE-TITLE PIC X VALUE "Local Title".
-     ^^^^^^^^^^
-  Field PAGE-TITLE already declared via COPY shared/config.rcl:8
-  Hint: rename the local field or remove it from the COPY source
-```
-
-**RCL-010 output:**
-```
-ERROR [RCL-010] unresolved-copy — program.rcl:5:4
-  COPY CUSTOMER-FIELDS FROM "shared/customer.rcl"
-                             ^^^^^^^^^^^^^^^^^^^^^
-  File not found: shared/customer.rcl
-```
-
-### `recall check --inspect` output with COPY
-When running `recall check --inspect`, the symbol table output must show the *source* of each field:
-
-```
-FIELD          PIC    VALUE              SOURCE
-PAGE-TITLE     X      "Welcome"          program.rcl:12
-CUSTOMER-NAME  X(30)  "Acme Corp"        shared/customer.rcl:4
-SITE-URL       URL    "https://..."      shared/config.rcl:8
-```
-
-This makes provenance visible — the AI compositor and the human both know exactly where every field came from.
-
-### AI-first implication
-WITH INTENT requires a *closed* symbol table — every field the AI can reference must be fully resolved before composition begins. The COPY clause with strict resolution guarantees this: by the time the AI compositor sees the DATA DIVISION, all COPY references have been resolved, all duplicates rejected, and the symbol table is complete and authoritative. No ambiguity enters the composition phase.
-
-### Implementation notes
-- Phase 1: implement COPY parsing and resolution, RCL-008/009/010 diagnostics
-- Phase 2: add `--inspect` source column
-- Phase 3: version pinning (`COPY CUSTOMER-FIELDS FROM "shared/customer.rcl" VERSION "1.2"`) — post-1.0
+### New codes reserved for COPY session
+- `RCL-024` — `unresolved-copy` (file not found)
+- `RCL-025` — `circular-copy` (cycle in COPY chain)
+- `RCL-026` — `duplicate-field` (field name collision between COPY and local DATA)
 
 ---
 
-## Implementation Priority
+## Implementation Order for Next Session
 
-| Item | Code(s) | Effort | Priority |
-|---|---|---|---|
-| Missing terminator | RCL-005 | Low | High — quick win, closes silent parse failures |
-| Uninitialised field | RCL-006 | Low | High — directly affects AI compositor signal |
-| PIC size overflow | RCL-007 | Low | Medium — catches a class of silent data bugs |
-| COPY clause | RCL-008/009/010 | High | Pre-1.0 — required before multi-file programs are practical |
+**Step 1 — Parser change (required for both items)**
+- Add `valueSet: boolean` to `DataField` in `src/parser/rcl.ts`
+- Update `parsePicValue()` to return and set `valueSet`
+- Update `parseDataField()` to pass `valueSet` through
 
-RCL-005, 006, 007 are incremental additions to the existing diagnostic pipeline — low risk, high signal value. The COPY clause is the largest piece and should be designed carefully before implementation begins.
+**Step 2 — RCL-023: Missing terminator**
+- Add `ParseWarning` type and `parseWarnings` array to `ReclProgram`
+- In `parseProcedure()`, detect DISPLAY lines missing `.` before stripping
+- In `typeCheck()`, drain `parseWarnings` into `DiagnosticCollector` at start
+- Add `RCL-023` to `codes.ts`
+- Add `recall explain RCL-023` support (already works via codes registry)
+
+**Step 3 — RCL-W06: Uninitialised field**
+- Add `collectReferencedNames()` helper — walks all PROCEDURE statements
+- Add `checkUninitialisedFields()` pass in typechecker
+- Call it from `typeCheck()` after `checkDataValues()`
+- Add `RCL-W06` to `codes.ts`
+
+**Step 4 — Tests**
+- Add test cases to the existing test suite for both diagnostics
+- Confirm `recall check --format json` emits correct codes
+
+**Step 5 — Version bump**
+- Bump to `0.8.7` in `package.json`
+- Update `recall-site` dependency and rebuild
 
 ---
 
-## Relationship to WITH INTENT
+## Files touched
 
-These four items are not optional polish. They are the foundation the AI compositor stands on.
+| File | Change |
+|---|---|
+| `src/parser/rcl.ts` | Add `valueSet` to `DataField`, `ParseWarning` type, populate in `parseProcedure` |
+| `src/typechecker/index.ts` | New `collectReferencedNames()`, `checkUninitialisedFields()`, drain parse warnings |
+| `src/diagnostics/codes.ts` | Add `RCL-023` and `RCL-W06` entries |
 
-WITH INTENT makes the claim: *the compiler validates whatever the AI produces.* That claim requires:
-
-- No silent parse failures (RCL-005)
-- No ambiguous uninitialised fields (RCL-006)  
-- No silent data truncation (RCL-007)
-- A closed, authoritative symbol table (COPY clause)
-
-Without these, WITH INTENT is a claim the compiler cannot fully honour. With them, the guarantee is real.
+Three files. No new files needed. No architectural changes beyond the `ParseWarning` channel.
