@@ -551,6 +551,59 @@ function checkComponents(
 }
 
 // ─────────────────────────────────────────────────────────
+// Pass 5 — Uninitialised field check (RCL-W06)
+// ─────────────────────────────────────────────────────────
+
+function collectReferencedNames(program: ReclProgram): Set<string> {
+  const names = new Set<string>()
+
+  function walkStmt(stmt: DisplayStatement): void {
+    // Direct value reference (e.g. DISPLAY HEADING-1 PAGE-TITLE)
+    if (stmt.value && /^[A-Z][A-Z0-9-]+$/.test(stmt.value)) {
+      names.add(stmt.value)
+    }
+    // USING clause
+    const using = stmt.clauses.find(c => c.key === 'USING')
+    if (using) names.add(using.value)
+    // WITH DATA clause — comma-separated field names
+    const data = stmt.clauses.find(c => c.key === 'DATA')
+    if (data) {
+      for (const n of data.value.split(',').map(s => s.trim()).filter(Boolean)) {
+        names.add(n)
+      }
+    }
+    for (const child of stmt.children) walkStmt(child)
+  }
+
+  for (const section of program.procedure.sections) {
+    for (const stmt of section.statements) walkStmt(stmt)
+  }
+  return names
+}
+
+function checkUninitialisedFields(
+  program:  ReclProgram,
+  file:     string,
+  dc:       DiagnosticCollector,
+): void {
+  const referenced = collectReferencedNames(program)
+  const fallback   = UNKNOWN_LOC(file)
+  const allFields  = [...program.data.workingStorage, ...program.data.items]
+
+  function checkField(field: DataField): void {
+    if (!field.valueSet && field.children.length === 0 && referenced.has(field.name)) {
+      dc.warning('RCL-W06', toLoc(field.loc, file, fallback),
+        `${field.name} is referenced in PROCEDURE DIVISION but has no VALUE clause`,
+        `Add VALUE "..." to set a value, or VALUE "" to explicitly declare an empty field`
+      )
+    }
+    for (const child of field.children) checkField(child)
+  }
+
+  for (const field of allFields) checkField(field)
+}
+
+// ─────────────────────────────────────────────────────────
 // Value checks — DATA DIVISION declarations
 // ─────────────────────────────────────────────────────────
 
@@ -647,8 +700,21 @@ export function typeCheck(
   const hasPlugins     = program.environment.plugins.length > 0
   const componentNames = new Set(program.component.components.map(c => c.name))
 
+  // Drain parse-time warnings (e.g. RCL-023 missing terminator)
+  for (const pw of program.parseWarnings) {
+    const loc: SourceLocation = {
+      file,
+      line:   pw.loc.line,
+      col:    pw.loc.col,
+      length: pw.loc.length,
+      source: pw.loc.source,
+    }
+    dc.error(pw.code, loc, pw.message, pw.hint)
+  }
+
   checkStructural(program, file, dc)
   checkDataValues(program, file, dc)
+  checkUninitialisedFields(program, file, dc)
   checkStatements(program, symbols, file, hasPlugins, componentNames, dc)
   checkComponents(program, symbols, file, dc)
 

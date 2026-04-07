@@ -261,6 +261,17 @@ export const CODES: Record<string, CodeDefinition> = {
     seeAlso:     [],
   },
 
+  'RCL-023': {
+    code:        'RCL-023',
+    severity:    'error',
+    category:    'syntax',
+    message:     'Statement has no terminator',
+    description: 'A PROCEDURE DIVISION statement does not end with a period. Every RECALL statement must be terminated with a full stop.',
+    example:     'DISPLAY HEADING-1 PAGE-TITLE   ← missing period',
+    fix:         'Add a period at the end of the statement: DISPLAY HEADING-1 PAGE-TITLE.',
+    seeAlso:     [],
+  },
+
   // ── Warnings ─────────────────────────────────────────
 
   'RCL-W01': {
@@ -305,6 +316,17 @@ export const CODES: Record<string, CodeDefinition> = {
     example:     'RENDER-EMPTY.\n   * Nothing here',
     fix:         'Add DISPLAY statements to the section, or remove it if not needed.',
     seeAlso:     [],
+  },
+
+  'RCL-W06': {
+    code:        'RCL-W06',
+    severity:    'warning',
+    category:    'data',
+    message:     'Field has no VALUE clause',
+    description: 'A field is referenced in PROCEDURE DIVISION but was declared without a VALUE clause. The field renders empty. For AI compositor clarity, every referenced field should have an explicit VALUE.',
+    example:     '01 PAGE-SUBTITLE PIC X.\nDISPLAY PARAGRAPH PAGE-SUBTITLE.   ← no VALUE declared',
+    fix:         'Add VALUE "..." to the field declaration, or VALUE "" to explicitly declare an intentional empty.',
+    seeAlso:     ['RCL-006'],
   },
 
   'RCL-W05': {

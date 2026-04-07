@@ -21,12 +21,20 @@ export interface NodeLocation {
 // AST interfaces
 // ─────────────────────────────────────────────────────────
 
+export interface ParseWarning {
+  code:    string
+  message: string
+  hint:    string
+  loc:     NodeLocation
+}
+
 export interface ReclProgram {
   identification: IdentificationDivision
-  environment: EnvironmentDivision
-  data: DataDivision
-  component: ComponentDivision
-  procedure: ProcedureDivision
+  environment:    EnvironmentDivision
+  data:           DataDivision
+  component:      ComponentDivision
+  procedure:      ProcedureDivision
+  parseWarnings:  ParseWarning[]   // diagnostics emitted during parsing, drained by typeCheck()
 }
 
 export interface IdentificationDivision {
@@ -62,13 +70,14 @@ export interface EnvironmentDivision {
 export type DataLevel = 1 | 5 | 10
 
 export interface DataField {
-  level: DataLevel
-  name: string
-  pic: string
-  value: string
+  level:    DataLevel
+  name:     string
+  pic:      string
+  value:    string
+  valueSet: boolean    // true if VALUE clause was present (even if VALUE "")
   comment?: string     // COMMENT "..." clause — intent metadata for AI tooling
   children: DataField[]
-  loc?: NodeLocation   // points at the variable name token
+  loc?:     NodeLocation   // points at the variable name token
 }
 
 export interface DataDivision {
@@ -183,7 +192,7 @@ function extractString(token: string): string {
   return token
 }
 
-function parsePicValue(tokens: string[]): { pic: string; value: string; comment?: string } {
+function parsePicValue(tokens: string[]): { pic: string; value: string; valueSet: boolean; comment?: string } {
   // e.g. PIC X(60) VALUE "hello" COMMENT "intent note"
   const picIdx     = tokens.indexOf('PIC')
   const valueIdx   = tokens.indexOf('VALUE')
@@ -200,7 +209,7 @@ function parsePicValue(tokens: string[]): { pic: string; value: string; comment?
     ? extractString(tokens.slice(commentIdx + 1).join(' '))
     : undefined
 
-  return { pic, value, comment }
+  return { pic, value, comment, valueSet: valueIdx >= 0 }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -335,9 +344,9 @@ function parseDataField(tokens: string[], lineNum: number, raw: string): DataFie
   const level = parseInt(tokens[0], 10) as DataLevel
   const name = tokens[1]
   const rest = tokens.slice(2)
-  const { pic, value, comment } = parsePicValue(rest)
+  const { pic, value, comment, valueSet } = parsePicValue(rest)
   const loc = makeLoc(lineNum, raw, name)
-  return { level, name, pic, value, comment, children: [], loc }
+  return { level, name, pic, value, valueSet, comment, children: [], loc }
 }
 
 function parseData(lines: LineEntry[]): DataDivision {
@@ -488,12 +497,13 @@ function joinContinuationLines(lines: LineEntry[]): JoinedLine[] {
   return joined
 }
 
-function parseProcedure(lines: LineEntry[]): ProcedureDivision {
+function parseProcedure(lines: LineEntry[]): { division: ProcedureDivision; warnings: ParseWarning[] } {
   const sections: ProcedureSection[] = []
   let current: ProcedureSection | null = null
   const sectionStack: DisplayStatement[] = []
   const joined = joinContinuationLines(lines)
   let hasStopRun = false
+  const warnings: ParseWarning[] = []
 
   for (const { text, lineNum, source } of joined) {
     if (!text) continue
@@ -517,6 +527,16 @@ function parseProcedure(lines: LineEntry[]): ProcedureDivision {
     }
 
     if (text.startsWith('DISPLAY') && current) {
+      // RCL-023: check for missing terminator before stripping the dot
+      if (!text.endsWith('.')) {
+        const col = text.length + 1
+        warnings.push({
+          code:    'RCL-023',
+          message: 'Statement has no terminator',
+          hint:    'Every RECALL statement must end with a period (.)',
+          loc:     { line: lineNum, col, length: 1, source },
+        })
+      }
       const tokens = text.replace(/\.$/, '').split(/\s+/)
       const stmt = parseDisplayStatement(tokens)
       // Attach location — point at the element name (tokens[1])
@@ -552,7 +572,7 @@ function parseProcedure(lines: LineEntry[]): ProcedureDivision {
     }
   }
 
-  return { sections, hasStopRun }
+  return { division: { sections, hasStopRun }, warnings }
 }
 
 function parseComponentDivision(lines: LineEntry[]): ComponentDivision {
@@ -658,11 +678,14 @@ export function parse(source: string): ReclProgram {
     if (currentDivision) buckets[currentDivision].push({ raw, lineNum })
   }
 
+  const { division: procedure, warnings: parseWarnings } = parseProcedure(buckets.PROCEDURE)
+
   return {
     identification: parseIdentification(buckets.IDENTIFICATION),
     environment:    parseEnvironment(buckets.ENVIRONMENT),
     data:           parseData(buckets.DATA),
     component:      parseComponentDivision(buckets.COMPONENT),
-    procedure:      parseProcedure(buckets.PROCEDURE),
+    procedure,
+    parseWarnings,
   }
 }

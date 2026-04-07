@@ -67,8 +67,16 @@ describe('COMPONENT DIVISION parser', () => {
 
   it('parses ACCEPTS list', () => {
     const p = parse(SOURCE_WITH_COMPONENT)
-    expect(p.component.components[0].accepts).toEqual(['TITLE', 'BODY', 'CTA-LABEL', 'CTA-HREF'])
-    expect(p.component.components[1].accepts).toEqual(['NAME', 'DESC'])
+    expect(p.component.components[0].accepts).toEqual([
+      { name: 'TITLE',     required: false },
+      { name: 'BODY',      required: false },
+      { name: 'CTA-LABEL', required: false },
+      { name: 'CTA-HREF',  required: false },
+    ])
+    expect(p.component.components[1].accepts).toEqual([
+      { name: 'NAME', required: false },
+      { name: 'DESC', required: false },
+    ])
   })
 
   it('parses component body as SECTION with children', () => {

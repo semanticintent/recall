@@ -13,6 +13,8 @@ export type DiagnosticCategory =
   | 'group-shape'
   | 'structural'
   | 'format'
+  | 'syntax'
+  | 'data'
 
 export interface SourceLocation {
   file:   string   // absolute path to .rcl source
