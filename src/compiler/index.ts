@@ -644,7 +644,8 @@ export interface CheckResult {
   ok: boolean
   inputPath: string
   errors: string[]
-  warnings?: boolean   // true when warnings present (exit code 2)
+  warningMessages: string[]   // formatted warning strings, same shape as errors
+  warnings?: boolean          // true when warnings present (exit code 2)
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1041,18 +1042,18 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
   const absInput = resolve(inputPath)
 
   if (!existsSync(absInput)) {
-    return { ok: false, inputPath: absInput, errors: [`FILE NOT FOUND: ${absInput}`] }
+    return { ok: false, inputPath: absInput, errors: [`FILE NOT FOUND: ${absInput}`], warningMessages: [] }
   }
 
   if (!absInput.endsWith('.rcl')) {
-    return { ok: false, inputPath: absInput, errors: ['NOT A RECALL SOURCE FILE. EXPECTED .rcl EXTENSION.'] }
+    return { ok: false, inputPath: absInput, errors: ['NOT A RECALL SOURCE FILE. EXPECTED .rcl EXTENSION.'], warningMessages: [] }
   }
 
   let source: string
   try {
     source = readFileSync(absInput, 'utf-8')
   } catch (err) {
-    return { ok: false, inputPath: absInput, errors: [`CANNOT READ FILE: ${(err as Error).message}`] }
+    return { ok: false, inputPath: absInput, errors: [`CANNOT READ FILE: ${(err as Error).message}`], warningMessages: [] }
   }
 
   const fileFallback: SourceLocation = { file: absInput, line: 1, col: 1, length: 1, source: '' }
@@ -1083,6 +1084,7 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
         ok: false,
         inputPath: absInput,
         errors: recordResult.errors.map(e => `[${e.code}] ${e.message}`),
+        warningMessages: [],
       }
     }
 
@@ -1105,6 +1107,7 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
         ok: false,
         inputPath: absInput,
         errors: loadResult.errors.map(e => `[${e.code}] ${e.message}`),
+        warningMessages: [],
       }
     }
 
@@ -1133,10 +1136,11 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
     }
 
     return {
-      ok:        !dc.hasErrors(),
-      inputPath: absInput,
-      errors:    dc.errors().map(d => `[${d.code}] ${d.message}: ${d.why}`),
-      warnings:  dc.hasWarnings(),
+      ok:              !dc.hasErrors(),
+      inputPath:       absInput,
+      errors:          dc.errors().map(d => `[${d.code}] ${d.message}: ${d.why}`),
+      warningMessages: dc.warnings().map(d => `[${d.code}] ${d.message}: ${d.why}`),
+      warnings:        dc.hasWarnings(),
     }
   } catch (err) {
     const msg = (err as Error).message ?? String(err)
@@ -1154,7 +1158,7 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
           printDiagnostics(copyDc)
         }
       }
-      return { ok: false, inputPath: absInput, errors: [msg] }
+      return { ok: false, inputPath: absInput, errors: [msg], warningMessages: [] }
     }
     // ── RCL-015: COPY FROM path unresolvable — convert to structured diagnostic ──
     const isCopyError = /cannot resolve package path|ENOENT|no such file/i.test(msg)
@@ -1171,8 +1175,8 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
           printDiagnostics(copyDc)
         }
       }
-      return { ok: false, inputPath: absInput, errors: [`[RCL-015] ${msg}`] }
+      return { ok: false, inputPath: absInput, errors: [`[RCL-015] ${msg}`], warningMessages: [] }
     }
-    return { ok: false, inputPath: absInput, errors: [`PARSE ERROR: ${msg}`] }
+    return { ok: false, inputPath: absInput, errors: [`PARSE ERROR: ${msg}`], warningMessages: [] }
   }
 }

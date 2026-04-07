@@ -64,15 +64,15 @@ function parsePic(pic: string): { kind: PicKind; maxLength: number } {
   return { kind: 'unknown', maxLength: 0 }
 }
 
-function dataFieldToSymbol(field: DataField): Symbol {
+function dataFieldToSymbol(field: DataField, forceGroup = false): Symbol {
   const { kind, maxLength } = parsePic(field.pic)
-  const isGroup = field.children.length > 0
+  const isGroup = forceGroup || field.children.length > 0
   return {
     name:      field.name,
     kind:      isGroup ? 'group' : kind,
     maxLength,
     isGroup,
-    children:  field.children.map(dataFieldToSymbol),
+    children:  field.children.map(f => dataFieldToSymbol(f)),
     rawPic:    field.pic,
     comment:   field.comment,
   }
@@ -180,11 +180,18 @@ type SymbolTable = Map<string, Symbol>
 
 function buildSymbolTable(program: ReclProgram): SymbolTable {
   const table = new Map<string, Symbol>()
-  const allFields = [...program.data.workingStorage, ...program.data.items]
-  for (const field of allFields) {
+  for (const field of program.data.workingStorage) {
     const sym = dataFieldToSymbol(field)
     table.set(field.name, sym)
-    // Also index children by name for flat lookups
+    for (const child of field.children) {
+      table.set(child.name, dataFieldToSymbol(child))
+    }
+  }
+  // ITEMS SECTION top-level 01 entries are always groups (containers),
+  // even if they currently have no children — enables RCL-W01 on empty groups
+  for (const field of program.data.items) {
+    const sym = dataFieldToSymbol(field, true)
+    table.set(field.name, sym)
     for (const child of field.children) {
       table.set(child.name, dataFieldToSymbol(child))
     }
