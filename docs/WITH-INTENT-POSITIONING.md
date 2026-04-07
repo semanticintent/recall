@@ -262,6 +262,70 @@ with the composition.
 
 ---
 
+## Lessons Learned as Positioning: The Hardening Arc
+
+The AI-first positioning is not a claim made in advance. It is a claim
+proven by the implementation decisions made in sequence.
+
+COBOL had four failure modes — silent dot collapse, column sensitivity,
+copybook proliferation, and implicit behavior. All four share the same
+root: the language trusted the programmer to know things the compiler
+could have enforced.
+
+RECALL's compiler hardening work (v0.8.7) applied those four lessons
+directly:
+
+- **RCL-023** — the compiler now catches missing terminators that
+  programmers forget. More precisely: that AI compositors might omit.
+- **RCL-W06** — the compiler now flags fields referenced but never
+  given a VALUE. An AI compositor inheriting an uninitialised field
+  has no way to know whether to generate content or leave it empty.
+- **`valueSet: boolean`** — the compiler now distinguishes `VALUE ""`
+  (declared empty, intentional) from no VALUE clause (undeclared,
+  ambiguous). At runtime both render empty. In the compiler's symbol
+  table they mean completely different things.
+
+That last distinction is the clearest statement of AI-first design:
+two states that look identical to a human programmer, but carry
+fundamentally different semantic weight for an AI compositor. The
+compiler makes the distinction explicit — not as a hint, but as a
+formal property of the field's declaration.
+
+**The discipline that emerges:**
+
+Most languages are designed for human programmers who fill gaps with
+implicit knowledge. RECALL is designed for a human-AI pair where the
+compiler is the shared authority. Every ambiguity the compiler can
+resolve, it must resolve — loudly, with a stable code — because the
+AI has no implicit knowledge to fall back on.
+
+COBOL encoded business intent precisely enough for mainframes to
+execute it for 60 years. RECALL encodes document intent precisely
+enough for AI compositors to expand it correctly. Same discipline,
+different era, different output target.
+
+**The sentence that positions it:**
+
+> RECALL is what COBOL's discipline looks like when the runtime is
+> an AI compositor.
+
+This is not a metaphor. COBOL's divisions enforce separation of
+concerns so that the machine can be trusted with execution. RECALL's
+divisions enforce the same separation so that the AI compositor can
+be trusted with composition. The compiler validates both.
+
+The hardening work is not polish. Each diagnostic added before
+WITH INTENT ships is a guarantee made to the AI compositor: if you
+produce output within this language, the compiler will catch every
+structural error before any human sees it. The contract is only as
+strong as the compiler's ability to catch everything it can catch.
+
+This is the COBOL insight applied to the AI era — and the reason
+it cannot be retrofitted onto an existing language. The discipline
+has to be designed in from the foundation.
+
+---
+
 ## Status and Next Steps
 
 This document records the concept as it stands in April 2026.
