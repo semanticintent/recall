@@ -2,6 +2,10 @@
 // RECALL HTML Generator — ReclProgram AST → HTML string
 // ─────────────────────────────────────────────────────────
 
+import { createRequire } from 'module'
+const _require = createRequire(import.meta.url)
+const RECALL_VERSION: string = (_require('../../package.json') as { version: string }).version
+
 import type {
   ReclProgram,
   EnvironmentDivision,
@@ -902,7 +906,7 @@ export function generate(program: ReclProgram, source: string): string {
 ${'*'.repeat(54)}
 * RECALL COMPILED OUTPUT
 * SOURCE: (embedded below)
-* RECALL VERSION: 0.1
+* RECALL VERSION: ${RECALL_VERSION}
 ${'*'.repeat(54)}
 
 ${source.split('\n').map(l => (l ? `* ${l}` : '*')).join('\n')}
