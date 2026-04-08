@@ -384,6 +384,28 @@ export const CODES: Record<string, CodeDefinition> = {
     seeAlso:     ['RCL-024', 'RCL-018'],
   },
 
+  'RCL-027': {
+    code:        'RCL-027',
+    severity:    'error',
+    category:    'structural',
+    message:     'WITH INTENT expansion failed',
+    description: 'The compositor returned a response that did not produce valid RECALL source. The expanded file was not written.',
+    example:     '* recall expand page.rcl → compositor returned invalid RECALL syntax',
+    fix:         'Check the compositor response. Run `recall expand --dry-run` to inspect the payload being sent. Revise the intent string or compositor prompt.',
+    seeAlso:     ['RCL-W09'],
+  },
+
+  'RCL-W09': {
+    code:        'RCL-W09',
+    severity:    'warning',
+    category:    'structural',
+    message:     'Unexpanded WITH INTENT clause',
+    description: 'A DISPLAY statement has a WITH INTENT clause that has not yet been expanded by `recall expand`. The statement renders as an HTML comment placeholder. Run `recall expand` to resolve it.',
+    example:     'DISPLAY HERO\n   WITH INTENT "dramatic opening".   ← not yet expanded',
+    fix:         'Run `recall expand <file>` to call the compositor and generate the expanded source file.',
+    seeAlso:     ['RCL-027'],
+  },
+
   'RCL-W05': {
     code:        'RCL-W05',
     severity:    'warning',

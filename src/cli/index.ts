@@ -8,6 +8,7 @@ import { statsCommand } from './commands/stats.js'
 import { historyCommand } from './commands/history.js'
 import { fixCommand } from './commands/fix.js'
 import { scaffoldCommand } from './commands/scaffold.js'
+import { expandCommand } from './commands/expand.js'
 
 const program = new Command()
 
@@ -50,7 +51,12 @@ Workflow:
   Scaffold a new .rcl from a plugin component:
     recall scaffold PAGE-HERO --plugin @semanticintent/recall-ui
     recall scaffold PAGE-HERO --plugin @semanticintent/recall-ui --out ./my-page.rcl
-    recall scaffold --list --plugin @semanticintent/recall-ui`)
+    recall scaffold --list --plugin @semanticintent/recall-ui
+
+  Expand WITH INTENT clauses using an AI compositor:
+    recall expand page.rcl              calls compositor, writes page.expanded.rcl
+    recall expand page.rcl --dry-run    print payload without making an API call
+    recall expand page.rcl --out ./out  write to a specific output directory`)
 
 program.addCommand(compileCommand)
 program.addCommand(checkCommand)
@@ -61,5 +67,6 @@ program.addCommand(statsCommand)
 program.addCommand(historyCommand)
 program.addCommand(fixCommand)
 program.addCommand(scaffoldCommand)
+program.addCommand(expandCommand)
 
 program.parse()

@@ -116,11 +116,12 @@ export interface DisplayClause {
 }
 
 export interface DisplayStatement {
-  element: DisplayElement | string
-  value?: string        // variable name or literal
-  clauses: DisplayClause[]
+  element:  DisplayElement | string
+  value?:   string        // variable name or literal
+  intent?:  string        // WITH INTENT "..." — present means unexpanded; compositor will resolve
+  clauses:  DisplayClause[]
   children: DisplayStatement[]
-  loc?: NodeLocation   // points at the element name token
+  loc?:     NodeLocation   // points at the element name token
 }
 
 export interface ProcedureSection {
@@ -450,6 +451,7 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
 
   const element = tokens[1] as DisplayElement
   let value: string | undefined
+  let intent: string | undefined
   const clauses: DisplayClause[] = []
 
   let i = 2
@@ -460,7 +462,13 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
 
   while (i < tokens.length) {
     const kw = tokens[i]
-    if (kw === 'WITH' && i + 1 < tokens.length && tokens[i + 1] === 'DATA') {
+    if (kw === 'WITH' && i + 1 < tokens.length && tokens[i + 1] === 'INTENT' && i + 2 < tokens.length) {
+      // WITH INTENT "..." — natural language intent for AI compositor
+      // NOTE: WITH must never appear in joinContinuationLines new-statement heuristic —
+      // WITH INTENT / WITH DATA are continuation clauses of DISPLAY, not new statements.
+      intent = extractString(tokens[i + 2])
+      i += 3; continue
+    } else if (kw === 'WITH' && i + 1 < tokens.length && tokens[i + 1] === 'DATA') {
       const fields: string[] = []
       let j = i + 2
       while (j < tokens.length && tokens[j] !== 'WITH') {
@@ -491,7 +499,7 @@ function parseDisplayStatement(rawTokens: string[]): DisplayStatement {
   }
 
   // loc attached by caller (has access to lineNum and raw source)
-  return { element, value, clauses, children: [] }
+  return { element, value, intent, clauses, children: [] }
 }
 
 function joinContinuationLines(lines: LineEntry[]): JoinedLine[] {

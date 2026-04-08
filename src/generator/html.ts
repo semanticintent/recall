@@ -807,6 +807,12 @@ function renderStatementWithRegistry(
   data: DataDivision,
   registry: ComponentRegistry,
 ): string {
+  // WITH INTENT — not yet expanded by `recall expand`. Render as a placeholder comment.
+  // RCL-W09 is emitted by the type checker; the page still compiles.
+  if (stmt.intent !== undefined) {
+    return `<!-- WITH INTENT: ${stmt.intent} (unexpanded — run recall expand) -->`
+  }
+
   switch (stmt.element) {
     case 'HEADING-1':   return renderHeading(stmt, data, 1)
     case 'HEADING-2':   return renderHeading(stmt, data, 2)

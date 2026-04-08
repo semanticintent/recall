@@ -1,7 +1,7 @@
 # RECALL Roadmap
 
 > Last updated: April 2026
-> Current version: **0.9.0**
+> Current version: **1.0.0**
 
 ---
 
@@ -39,7 +39,7 @@ never break the contract between layers.
 | **0.8.10** | **ParseWarning severity fix — W-prefixed codes emit as warnings** | ✅ Complete |
 | **0.8.11** | **VALUE HEREDOC + pipeline hardening** | ✅ Complete |
 | **0.9.0** | **DATA COPY — COPY FROM in DATA DIVISION** | ✅ Complete |
-| **1.0.0** | **Stable language + WITH INTENT + site manifest** | 🟡 In progress |
+| **1.0.0** | **WITH INTENT — AI composition primitive + recall expand** | ✅ Complete |
 | **post-1.0** | **Output targets + LSP + recall diff + AUDIT DIVISION** | 📋 Planned |
 
 ---
@@ -284,7 +284,65 @@ The preprocessor pipeline was previously duplicated across four call sites
 
 ---
 
-## v1.0 — Stable Language
+## v1.0.0 — WITH INTENT ✅ Complete
+
+**Goal:** Implement the AI-first thesis. The language now has a formally constrained
+mechanism for AI-driven composition — structured, compiler-validated, human-reviewable.
+
+### What it ships
+
+**`WITH INTENT`** — annotates a DISPLAY statement with natural language intent:
+
+```cobol
+PROCEDURE DIVISION.
+   RENDER.
+      DISPLAY HERO
+         WITH INTENT "dramatic opening, single product, urgency without hype"
+         WITH DATA PRODUCT-NAME, PRODUCT-TAGLINE, CTA-PRIMARY.
+   STOP RUN.
+```
+
+Before expansion: compiles with an HTML placeholder comment (RCL-W09 warning).
+After `recall expand`: a `.expanded.rcl` file replaces the WITH INTENT with
+concrete DISPLAY statements. Author reviews, renames, commits.
+
+**`recall expand`** — new CLI command:
+```sh
+recall expand page.rcl              # calls compositor, writes page.expanded.rcl
+recall expand page.rcl --dry-run    # print compositor payload, no API call
+recall expand page.rcl --out ./out  # write to a specific directory
+```
+
+**Compositor contract** (`docs/COMPOSITOR-CONTRACT.md`) — normative specification
+for the JSON payload and expected response. Versioned at `schemaVersion: "1.0"`.
+
+### New Diagnostic Codes
+
+| Code | Severity | Trigger |
+|---|---|---|
+| RCL-W09 | warning | Unexpanded WITH INTENT clause — renders as placeholder |
+| RCL-027 | error | Expansion failed — compositor returned invalid RECALL |
+
+### Implementation
+
+- `DisplayStatement.intent` — optional field in parser AST
+- `checkUnexpandedIntents()` — typechecker pass emitting RCL-W09
+- RCL-003 skip guard — `WITH INTENT` statements exempt from unknown-element check
+- `renderStatementWithRegistry()` — placeholder comment path in generator
+- `src/expand/index.ts` — pure `expand()` function (no CLI coupling)
+- `src/expand/prompt.ts` — compositor system prompt (iterable independently)
+- `src/cli/commands/expand.ts` — thin CLI wrapper
+
+### What 1.0 means
+
+- Core element vocabulary complete and stable
+- Breaking changes require a major version
+- The AI-first thesis is implemented, not just documented
+- 124 tests covering all 29 diagnostic codes
+
+---
+
+## v1.0 (archived planning) — Stable Language
 
 **Goal:** Language specification frozen. Compiler is a stable runtime. All diagnostic
 codes fire. The AI-first thesis is implemented, not just documented.

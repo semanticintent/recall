@@ -290,6 +290,11 @@ function checkStatement(
     return
   }
 
+  // Skip WITH INTENT statements — compositor will resolve element name and clauses.
+  // RCL-003 would fire for unknown elements like HERO; the skip guard suppresses it.
+  // RCL-W09 is emitted separately by checkUnexpandedIntents().
+  if (stmt.intent !== undefined) return
+
   // SECTION — check LAYOUT SPLIT child shape, then recurse and return
   if (element === 'SECTION') {
     // ── RCL-008 LAYOUT SPLIT child shape ──────────────────
@@ -588,6 +593,28 @@ function collectReferencedNames(program: ReclProgram): Set<string> {
   return names
 }
 
+function checkUnexpandedIntents(
+  program: ReclProgram,
+  file:    string,
+  dc:      DiagnosticCollector,
+): void {
+  const fallback = UNKNOWN_LOC(file)
+
+  function walkStmt(stmt: DisplayStatement): void {
+    if (stmt.intent !== undefined) {
+      dc.warning('RCL-W09', toLoc(stmt.loc, file, fallback),
+        `WITH INTENT "${stmt.intent}" has not been expanded`,
+        'Run `recall expand <file>` to call the compositor and generate the expanded source file'
+      )
+    }
+    for (const child of stmt.children) walkStmt(child)
+  }
+
+  for (const section of program.procedure.sections) {
+    for (const stmt of section.statements) walkStmt(stmt)
+  }
+}
+
 function checkUninitialisedFields(
   program:  ReclProgram,
   file:     string,
@@ -726,6 +753,7 @@ export function typeCheck(
   checkStructural(program, file, dc)
   checkDataValues(program, file, dc)
   checkUninitialisedFields(program, file, dc)
+  checkUnexpandedIntents(program, file, dc)
   checkStatements(program, symbols, file, hasPlugins, componentNames, dc)
   checkComponents(program, symbols, file, dc)
 
