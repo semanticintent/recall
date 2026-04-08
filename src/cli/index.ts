@@ -7,6 +7,7 @@ import { explainCommand } from './commands/explain.js'
 import { statsCommand } from './commands/stats.js'
 import { historyCommand } from './commands/history.js'
 import { fixCommand } from './commands/fix.js'
+import { scaffoldCommand } from './commands/scaffold.js'
 
 const program = new Command()
 
@@ -44,7 +45,12 @@ Workflow:
   Look up a diagnostic code:
     recall explain RCL-007             human-readable entry
     recall explain RCL-007 --json      machine-readable JSON
-    recall explain --list              all codes with summaries`)
+    recall explain --list              all codes with summaries
+
+  Scaffold a new .rcl from a plugin component:
+    recall scaffold PAGE-HERO --plugin @semanticintent/recall-ui
+    recall scaffold PAGE-HERO --plugin @semanticintent/recall-ui --out ./my-page.rcl
+    recall scaffold --list --plugin @semanticintent/recall-ui`)
 
 program.addCommand(compileCommand)
 program.addCommand(checkCommand)
@@ -54,5 +60,6 @@ program.addCommand(explainCommand)
 program.addCommand(statsCommand)
 program.addCommand(historyCommand)
 program.addCommand(fixCommand)
+program.addCommand(scaffoldCommand)
 
 program.parse()
