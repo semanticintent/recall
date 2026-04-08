@@ -833,6 +833,10 @@ RECALL Language Specification v0.8.8. Shatny, M. (2026).
 RECALL Cognitive Dimensions Analysis. Shatny, M. (2026).
 `/docs/COGNITIVE-DIMENSIONS-ANALYSIS.md`.
 
+Shatny, M. (2026). *RECALL: A COBOL-Inspired Publishing Language for the Web,
+and the Machine Legibility Dimensions Framework* (v0.8.8). Zenodo.
+https://doi.org/10.5281/zenodo.19463347
+
 ---
 
 *This document is a first proposal. Version 0.1. It should be cited as a

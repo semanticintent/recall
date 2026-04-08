@@ -18,6 +18,11 @@ authors:
     alias: semanticintent
     website: "https://semanticintent.dev"
 repository-code: "https://github.com/semanticintent/recall-compiler"
+doi: 10.5281/zenodo.19463347
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.19463347
+    description: "Zenodo DOI for RECALL v0.8.8 and the Machine Legibility Dimensions framework"
 url: "https://semanticintent.dev"
 license: MIT
 version: 0.8.8
