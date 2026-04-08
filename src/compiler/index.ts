@@ -600,6 +600,129 @@ function resolveComponentCopies(source: string, dir: string, seen: Set<string> =
   return result.join('\n')
 }
 
+// ─────────────────────────────────────────────────────────
+// DATA COPY — COPY FROM in DATA DIVISION
+// Inlines shared field definitions from .rcpy copybooks.
+// Runs after component copy resolution, before record expansion.
+// ─────────────────────────────────────────────────────────
+
+export interface DataCopyError {
+  directive: string
+  specifier: string
+  code:      'RCL-024' | 'RCL-025' | 'RCL-026'
+  message:   string
+}
+
+export interface DataCopyResult {
+  source: string
+  errors: DataCopyError[]
+}
+
+function extractDataContent(source: string): string[] {
+  const lines = source.split('\n')
+  const result: string[] = []
+  let inData = false
+  for (const line of lines) {
+    const t = line.trim()
+    if (t.startsWith('DATA DIVISION')) { inData = true; continue }
+    if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('DATA DIVISION'))) {
+      inData = false; continue
+    }
+    if (inData) result.push(line)
+  }
+  return result
+}
+
+function resolveDataCopies(
+  source:     string,
+  dir:        string,
+  seen:       Set<string> = new Set(),
+  knownNames: Set<string> = new Set(),
+): DataCopyResult {
+  const lines = source.split('\n')
+  const result: string[] = []
+  const errors: DataCopyError[] = []
+  let inData  = false
+  let inValue = false
+
+  for (const line of lines) {
+    const t = line.trim()
+
+    if (inValue) {
+      result.push(line)
+      if (t.trimEnd().endsWith('".')) inValue = false
+      continue
+    }
+    if (opensMultilineValue(t)) { inValue = true; result.push(line); continue }
+
+    if (t.startsWith('DATA DIVISION')) { inData = true; result.push(line); continue }
+    if (DIVISION_STARTS.some(d => t.startsWith(d) && !t.startsWith('DATA DIVISION'))) {
+      inData = false; result.push(line); continue
+    }
+
+    if (inData && t.startsWith('COPY FROM')) {
+      const match = t.match(/COPY FROM\s+"([^"]+)"/)
+      if (match) {
+        const specifier = match[1]
+        let filePath: string
+        try {
+          filePath = resolve(resolveFilePath(specifier, dir))
+        } catch {
+          errors.push({ directive: t, specifier, code: 'RCL-024',
+            message: `DATA COPY "${specifier}" — file not found` })
+          continue
+        }
+        if (!existsSync(filePath)) {
+          errors.push({ directive: t, specifier, code: 'RCL-024',
+            message: `DATA COPY "${specifier}" — file not found` })
+          continue
+        }
+        if (seen.has(filePath)) {
+          errors.push({ directive: t, specifier, code: 'RCL-026',
+            message: `Circular DATA COPY: "${specifier}" is already being included` })
+          continue
+        }
+        const nextSeen = new Set(seen).add(filePath)
+        const copySource = readFileSync(filePath, 'utf-8')
+        // Resolve the copybook with a fresh knownNames — it tracks collisions within the
+        // copybook's own nested COPY FROM chain. We check parent-level collisions below.
+        const nested = resolveDataCopies(copySource, dirname(filePath), nextSeen)
+        errors.push(...nested.errors)
+        for (const dl of extractDataContent(nested.source)) {
+          const fieldMatch = dl.trim().match(/^01\s+([A-Z][A-Z0-9-]+)[\s.]/)
+          if (fieldMatch) {
+            const name = fieldMatch[1]
+            if (knownNames.has(name)) {
+              errors.push({ directive: t, specifier, code: 'RCL-025',
+                message: `Field "${name}" from DATA COPY "${specifier}" collides with existing field` })
+              continue
+            }
+            knownNames.add(name)
+          }
+          result.push(dl)
+        }
+      } else {
+        result.push(line)
+      }
+    } else {
+      if (inData) {
+        const fieldMatch = t.match(/^01\s+([A-Z][A-Z0-9-]+)[\s.]/)
+        if (fieldMatch) {
+          const name = fieldMatch[1]
+          if (knownNames.has(name)) {
+            errors.push({ directive: t, specifier: '(local)', code: 'RCL-025',
+              message: `Field "${name}" declared locally collides with field from a DATA COPY` })
+          } else {
+            knownNames.add(name)
+          }
+        }
+      }
+      result.push(line)
+    }
+  }
+  return { source: result.join('\n'), errors }
+}
+
 function resolveThemeCopies(source: string, dir: string, seen: Set<string> = new Set()): string {
   const lines = source.split('\n')
   const result: string[] = []
@@ -708,18 +831,37 @@ export async function loadPlugins(sourcePath: string): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────
+// runPreprocessorPipeline — single source of truth for the full preprocessor pipeline.
+// All public functions (compile, check, inspect, parseFromSource) call this helper
+// so that adding a new stage only requires a change here.
+// ─────────────────────────────────────────────────────────
+
+interface PreprocessorResult {
+  source:         string
+  dataCopyResult: DataCopyResult
+  recordResult:   RecordResult
+  loadResult:     DataLoadResult
+}
+
+function runPreprocessorPipeline(source: string, dir: string): PreprocessorResult {
+  const withBlocks     = resolveBlockValues(source)
+  const withTheme      = resolveThemeCopies(withBlocks, dir)
+  const withComponents = resolveComponentCopies(withTheme, dir)
+  const dataCopyResult = resolveDataCopies(withComponents, dir)
+  const recordResult   = resolveRecordTypes(dataCopyResult.source)
+  const loadResult     = resolveDataLoads(recordResult.source, dir)
+  return { source: loadResult.source, dataCopyResult, recordResult, loadResult }
+}
+
+// ─────────────────────────────────────────────────────────
 // parseFromSource — run full preprocessor pipeline on an in-memory source string
 // Useful when the source is NOT on disk (e.g. old git version retrieved via git show).
 // baseDir is used to resolve COPY FROM / LOAD FROM paths — typically dirname(absFile).
 // ─────────────────────────────────────────────────────────
 
 export function parseFromSource(source: string, baseDir: string): ReturnType<typeof parse> {
-  const withBlocks     = resolveBlockValues(source)
-  const withTheme      = resolveThemeCopies(withBlocks, baseDir)
-  const withComponents = resolveComponentCopies(withTheme, baseDir)
-  const recordResult   = resolveRecordTypes(withComponents)
-  const loadResult     = resolveDataLoads(recordResult.source, baseDir)
-  return parse(loadResult.source)
+  const { source: processed } = runPreprocessorPipeline(source, baseDir)
+  return parse(processed)
 }
 
 // ─────────────────────────────────────────────────────────
@@ -754,14 +896,11 @@ export function inspect(inputPath: string): InspectResult {
     return empty
   }
   try {
-    const withBlocks     = resolveBlockValues(source)
-    const withTheme      = resolveThemeCopies(withBlocks, dirname(absInput))
-    const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const recordResult   = resolveRecordTypes(withComponents)
-    const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
+    const { source: processed, dataCopyResult, recordResult, loadResult } =
+      runPreprocessorPipeline(source, dirname(absInput))
 
     // Parse to extract COMMENT clauses from manually declared DATA fields
-    const program = parse(loadResult.source)
+    const program = parse(processed)
     const fieldComments: FieldComment[] = []
 
     function collectComments(fields: ReturnType<typeof parse>['data']['workingStorage'], section: FieldComment['section']): void {
@@ -776,8 +915,14 @@ export function inspect(inputPath: string): InspectResult {
     collectComments(program.data.workingStorage, 'working-storage')
     collectComments(program.data.items, 'items')
 
+    const allErrors = [
+      ...dataCopyResult.errors.map(e => ({ ...e, code: e.code as string })),
+      ...recordResult.errors.map(e => ({ ...e, code: e.code as string })),
+      ...loadResult.errors,
+    ]
+
     return {
-      ok:            loadResult.errors.length === 0 && recordResult.errors.length === 0,
+      ok:            allErrors.length === 0,
       inputPath:     absInput,
       entries:       loadResult.entries,
       errors:        loadResult.errors,
@@ -900,11 +1045,22 @@ export function compile(inputPath: string, outDir?: string, opts: CompileOptions
   const fileFallback: SourceLocation = { file: absInput, line: 1, col: 1, length: 1, source: '' }
 
   try {
-    const withBlocks     = resolveBlockValues(source)
-    const withTheme      = resolveThemeCopies(withBlocks, dirname(absInput))
-    const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const recordResult   = resolveRecordTypes(withComponents)
-    const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
+    const { source: processed, dataCopyResult, recordResult, loadResult } =
+      runPreprocessorPipeline(source, dirname(absInput))
+
+    // ── DATA COPY errors — abort before parse ────────────
+    if (dataCopyResult.errors.length > 0) {
+      const dc = new DiagnosticCollector()
+      for (const err of dataCopyResult.errors) {
+        dc.error(err.code, fileFallback, err.message,
+          err.code === 'RCL-024' ? 'Verify the path is correct relative to the .rcl source file, or that the npm package is installed' :
+          err.code === 'RCL-025' ? 'Rename the colliding field in either the local DATA DIVISION or the copybook' :
+          'Break the cycle: ensure no .rcpy file directly or indirectly includes itself'
+        )
+      }
+      printDiagnostics(dc)
+      return { ok: false, inputPath: absInput, error: 'DATA COPY errors — no output written' }
+    }
 
     // ── RECORD errors — abort before parse ────────────────
     if (recordResult.errors.length > 0) {
@@ -930,7 +1086,7 @@ export function compile(inputPath: string, outDir?: string, opts: CompileOptions
       return { ok: false, inputPath: absInput, error: 'LOAD FROM errors — no output written' }
     }
 
-    program = parse(loadResult.source)
+    program = parse(processed)
     resolveIncludes(program, dirname(absInput))
   } catch (err) {
     return { ok: false, inputPath: absInput, error: `PARSE ERROR: ${(err as Error).message}` }
@@ -1068,11 +1224,33 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
   const fileFallback: SourceLocation = { file: absInput, line: 1, col: 1, length: 1, source: '' }
 
   try {
-    const withBlocks     = resolveBlockValues(source)
-    const withTheme      = resolveThemeCopies(withBlocks, dirname(absInput))
-    const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const recordResult   = resolveRecordTypes(withComponents)
-    const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
+    const { source: processed, dataCopyResult, recordResult, loadResult } =
+      runPreprocessorPipeline(source, dirname(absInput))
+
+    // ── DATA COPY errors ──────────────────────────────────
+    if (dataCopyResult.errors.length > 0) {
+      const copyDc = new DiagnosticCollector()
+      for (const err of dataCopyResult.errors) {
+        copyDc.error(err.code, fileFallback, err.message,
+          err.code === 'RCL-024' ? 'Verify the path is correct relative to the .rcl source file, or that the npm package is installed' :
+          err.code === 'RCL-025' ? 'Rename the colliding field in either the local DATA DIVISION or the copybook' :
+          'Break the cycle: ensure no .rcpy file directly or indirectly includes itself'
+        )
+      }
+      if (!opts.quiet) {
+        if (opts.formatJson) {
+          process.stdout.write(JSON.stringify({ file: absInput, ...copyDc.toJSON() }, null, 2) + '\n')
+        } else {
+          printDiagnostics(copyDc)
+        }
+      }
+      return {
+        ok: false,
+        inputPath: absInput,
+        errors: dataCopyResult.errors.map(e => `[${e.code}] ${e.message}`),
+        warningMessages: [],
+      }
+    }
 
     // ── RECORD errors ─────────────────────────────────────
     if (recordResult.errors.length > 0) {
@@ -1120,7 +1298,7 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
       }
     }
 
-    const program = parse(loadResult.source)
+    const program = parse(processed)
     const dc      = typeCheck(program, absInput, { strict: opts.strict ?? false })
 
     if (!opts.quiet) {

@@ -1,7 +1,7 @@
 # RECALL Roadmap
 
 > Last updated: April 2026
-> Current version: **0.8.11**
+> Current version: **0.9.0**
 
 ---
 
@@ -38,6 +38,7 @@ never break the contract between layers.
 | **0.8.9** | **recall scaffold + component manifest (recall-ui)** | ✅ Complete |
 | **0.8.10** | **ParseWarning severity fix — W-prefixed codes emit as warnings** | ✅ Complete |
 | **0.8.11** | **VALUE HEREDOC + pipeline hardening** | ✅ Complete |
+| **0.9.0** | **DATA COPY — COPY FROM in DATA DIVISION** | ✅ Complete |
 | **1.0.0** | **Stable language + WITH INTENT + site manifest** | 🟡 In progress |
 | **post-1.0** | **Output targets + LSP + recall diff + AUDIT DIVISION** | 📋 Planned |
 
@@ -218,6 +219,68 @@ each stage sees only the literal forms it was designed to handle.
 
 Previous order: theme → component → block → record → data-loads → parse
 New order: **block → theme → component → record → data-loads → parse**
+
+---
+
+## v0.9.0 — DATA COPY ✅ Complete
+
+**Goal:** Shared field definitions across pages. Same `COPY FROM` keyword used in
+ENVIRONMENT and COMPONENT divisions — applied to DATA DIVISION for the first time.
+
+### What it ships
+
+**DATA COPY** — `COPY FROM` in DATA DIVISION inlines field definitions from `.rcpy`
+copybooks at compile time. Shared fields are author-declared, fully typed, and
+visible to the type checker, the AI compositor (`recall check --format json`), and
+the `recall schema` output.
+
+```cobol
+DATA DIVISION.
+   COPY FROM "shared/nav-fields.rcpy".
+   WORKING-STORAGE SECTION.
+      01 PAGE-TITLE PIC X(60) VALUE "Home".
+```
+
+A data copybook is a `.rcpy` file with a DATA DIVISION:
+
+```cobol
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+      01 NAV-TITLE PIC X(40) VALUE "RECALL".
+      01 NAV-HREF  PIC URL   VALUE "/".
+   ITEMS SECTION.
+      01 NAV-ITEMS.
+         05 NAV-ITEMS-1.
+            10 NAV-ITEMS-1-LABEL PIC X(30) VALUE "Home".
+            10 NAV-ITEMS-1-HREF  PIC URL   VALUE "/".
+```
+
+Nested COPY chains are resolved recursively. Circular dependencies are detected.
+Field name collisions between copybook and local declarations are errors.
+
+### New Diagnostic Codes
+
+| Code | Severity | Trigger |
+|---|---|---|
+| RCL-024 | error | DATA COPY file not found or unresolvable npm path |
+| RCL-025 | error | Field name collision — copybook field collides with local or prior field |
+| RCL-026 | error | Circular DATA COPY dependency |
+
+### Pipeline position
+
+`resolveDataCopies` runs after component copy resolution and before record expansion:
+
+```
+resolveBlockValues → resolveThemeCopies → resolveComponentCopies
+→ resolveDataCopies   ← NEW
+→ resolveRecordTypes → resolveDataLoads → parse
+```
+
+### `runPreprocessorPipeline()` helper
+
+The preprocessor pipeline was previously duplicated across four call sites
+(`compile`, `check`, `inspect`, `parseFromSource`). Extracted into a single
+`runPreprocessorPipeline()` function — new stages are added once, not four times.
 
 ---
 

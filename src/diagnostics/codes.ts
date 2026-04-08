@@ -351,6 +351,39 @@ export const CODES: Record<string, CodeDefinition> = {
     seeAlso:     ['RCL-006'],
   },
 
+  'RCL-024': {
+    code:        'RCL-024',
+    severity:    'error',
+    category:    'unknown-identifier',
+    message:     'DATA COPY file not found',
+    description: 'A COPY FROM directive in the DATA DIVISION references a .rcpy file that cannot be found on disk or cannot be resolved as an npm package path.',
+    example:     'DATA DIVISION.\n   COPY FROM "shared/nav-fields.rcpy".   ← file not found',
+    fix:         'Verify the path is correct relative to the .rcl source file. For npm package paths (@scope/pkg/file.rcpy), verify the package is installed.',
+    seeAlso:     ['RCL-015', 'RCL-025', 'RCL-026'],
+  },
+
+  'RCL-025': {
+    code:        'RCL-025',
+    severity:    'error',
+    category:    'structural',
+    message:     'DATA COPY field name collision',
+    description: 'A field name declared in a DATA COPY copybook already exists in the local DATA DIVISION or a previously resolved copybook. The duplicate field is skipped.',
+    example:     '01 NAV-TITLE PIC X(40) VALUE "Local".\nCOPY FROM "shared/nav.rcpy".   ← nav.rcpy also declares NAV-TITLE',
+    fix:         'Rename the colliding field in either the local DATA DIVISION or the copybook so that every field name is unique.',
+    seeAlso:     ['RCL-024', 'RCL-026'],
+  },
+
+  'RCL-026': {
+    code:        'RCL-026',
+    severity:    'error',
+    category:    'structural',
+    message:     'Circular DATA COPY dependency',
+    description: 'A COPY FROM chain in the DATA DIVISION creates a cycle — file A copies B which copies A (directly or transitively).',
+    example:     '* nav.rcpy: COPY FROM "footer.rcpy"\n* footer.rcpy: COPY FROM "nav.rcpy"   ← cycle',
+    fix:         'Extract shared fields into a third file that neither file imports.',
+    seeAlso:     ['RCL-024', 'RCL-018'],
+  },
+
   'RCL-W05': {
     code:        'RCL-W05',
     severity:    'warning',
