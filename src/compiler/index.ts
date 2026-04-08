@@ -212,54 +212,63 @@ function opensMultilineValue(t: string): boolean {
 // - Runs before resolveDataLoads so BLOCK values appear as normal fields.
 // ─────────────────────────────────────────────────────────
 
+// Collapse a block of content lines into a single-line VALUE "..." string.
+// Used by both VALUE BLOCK and VALUE HEREDOC resolution.
+function collapseBlockContent(decl: string, indent: string, content: string[], blockKeyword: string): string {
+  const joined   = content.join('\n').trim()
+  const safe     = joined.replace(/"/g, "'").replace(/\r?\n/g, '\\n')
+  const autoSizeN = Math.ceil(safe.length * 1.2)
+  const autoSize  = decl.replace(/\bPIC\s+X\b(?!\s*\()/, `PIC X(${autoSizeN})`)
+  const pattern   = new RegExp(`\\bVALUE\\s+${blockKeyword}\\.?\\s*$`)
+  const resolved  = autoSize.replace(pattern, `VALUE "${safe}".`)
+  return indent + resolved.trimStart()
+}
+
 function resolveBlockValues(source: string): string {
   const lines = source.split('\n')
   const result: string[] = []
-  let inBlock = false
-  let blockDecl = ''      // the full declaration line before VALUE BLOCK.
-  let blockIndent = ''    // leading whitespace to restore
+  let mode: 'none' | 'block' | 'heredoc' = 'none'
+  let blockDecl    = ''
+  let blockIndent  = ''
   let blockContent: string[] = []
 
   for (const line of lines) {
     const t = line.trim()
 
-    if (inBlock) {
+    if (mode === 'block') {
       if (t === 'END VALUE.' || t === 'END VALUE') {
-        // Join lines and encode as a safe single-line VALUE string
-        const content  = blockContent.join('\n').trim()
-        const safe     = content.replace(/"/g, "'").replace(/\r?\n/g, '\\n')
-        // Auto-size with 20% headroom so RCL-W02 doesn't fire on auto-sized fields
-        const autoSizeN = Math.ceil(safe.length * 1.2)
-        const autoSize  = blockDecl.replace(
-          /\bPIC\s+X\b(?!\s*\()/,
-          `PIC X(${autoSizeN})`
-        )
-        const resolved = autoSize.replace(
-          /\bVALUE\s+BLOCK\.?\s*$/,
-          `VALUE "${safe}".`
-        )
-        result.push(blockIndent + resolved.trimStart())
-        inBlock = false
-        blockContent = []
-        blockDecl = ''
-        blockIndent = ''
+        result.push(collapseBlockContent(blockDecl, blockIndent, blockContent, 'BLOCK'))
+        mode = 'none'; blockContent = []; blockDecl = ''; blockIndent = ''
       } else {
-        // Preserve content lines — strip leading indent beyond field indent
         blockContent.push(t)
       }
       continue
     }
 
-    // Only match VALUE BLOCK when the keyword is NOT inside a quoted VALUE string.
-    // A line like: 01 FOO PIC X(100) VALUE "... PIC X VALUE BLOCK.  contains VALUE " before
-    // the match — that means VALUE BLOCK is inside a string literal, not a real declaration.
+    if (mode === 'heredoc') {
+      if (t === 'END HEREDOC.' || t === 'END HEREDOC') {
+        result.push(collapseBlockContent(blockDecl, blockIndent, blockContent, 'HEREDOC'))
+        mode = 'none'; blockContent = []; blockDecl = ''; blockIndent = ''
+      } else {
+        // HEREDOC is fully opaque — preserve raw line (do not strip indent)
+        blockContent.push(line)
+      }
+      continue
+    }
+
+    // VALUE BLOCK — content lines have leading indent stripped (original behaviour)
+    // Only match when NOT already inside a quoted VALUE string (no " before keyword).
     const blockMatch = /\bVALUE\s+BLOCK\.?\s*$/.exec(t)
     if (blockMatch && !t.slice(0, blockMatch.index).includes('"')) {
-      inBlock = true
-      blockDecl = t
-      blockIndent = line.match(/^(\s*)/)?.[1] ?? ''
-      blockContent = []
-      continue
+      mode = 'block'; blockDecl = t; blockIndent = line.match(/^(\s*)/)?.[1] ?? ''
+      blockContent = []; continue
+    }
+
+    // VALUE HEREDOC — fully opaque block. Closed only by END HEREDOC.
+    const heredocMatch = /\bVALUE\s+HEREDOC\.?\s*$/.exec(t)
+    if (heredocMatch && !t.slice(0, heredocMatch.index).includes('"')) {
+      mode = 'heredoc'; blockDecl = t; blockIndent = line.match(/^(\s*)/)?.[1] ?? ''
+      blockContent = []; continue
     }
 
     result.push(line)
@@ -705,10 +714,10 @@ export async function loadPlugins(sourcePath: string): Promise<void> {
 // ─────────────────────────────────────────────────────────
 
 export function parseFromSource(source: string, baseDir: string): ReturnType<typeof parse> {
-  const withTheme      = resolveThemeCopies(source, baseDir)
+  const withBlocks     = resolveBlockValues(source)
+  const withTheme      = resolveThemeCopies(withBlocks, baseDir)
   const withComponents = resolveComponentCopies(withTheme, baseDir)
-  const withBlocks     = resolveBlockValues(withComponents)
-  const recordResult   = resolveRecordTypes(withBlocks)
+  const recordResult   = resolveRecordTypes(withComponents)
   const loadResult     = resolveDataLoads(recordResult.source, baseDir)
   return parse(loadResult.source)
 }
@@ -745,10 +754,10 @@ export function inspect(inputPath: string): InspectResult {
     return empty
   }
   try {
-    const withTheme      = resolveThemeCopies(source, dirname(absInput))
+    const withBlocks     = resolveBlockValues(source)
+    const withTheme      = resolveThemeCopies(withBlocks, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const withBlocks     = resolveBlockValues(withComponents)
-    const recordResult   = resolveRecordTypes(withBlocks)
+    const recordResult   = resolveRecordTypes(withComponents)
     const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
 
     // Parse to extract COMMENT clauses from manually declared DATA fields
@@ -891,10 +900,10 @@ export function compile(inputPath: string, outDir?: string, opts: CompileOptions
   const fileFallback: SourceLocation = { file: absInput, line: 1, col: 1, length: 1, source: '' }
 
   try {
-    const withTheme      = resolveThemeCopies(source, dirname(absInput))
+    const withBlocks     = resolveBlockValues(source)
+    const withTheme      = resolveThemeCopies(withBlocks, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const withBlocks     = resolveBlockValues(withComponents)
-    const recordResult   = resolveRecordTypes(withBlocks)
+    const recordResult   = resolveRecordTypes(withComponents)
     const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
 
     // ── RECORD errors — abort before parse ────────────────
@@ -1059,10 +1068,10 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
   const fileFallback: SourceLocation = { file: absInput, line: 1, col: 1, length: 1, source: '' }
 
   try {
-    const withTheme      = resolveThemeCopies(source, dirname(absInput))
+    const withBlocks     = resolveBlockValues(source)
+    const withTheme      = resolveThemeCopies(withBlocks, dirname(absInput))
     const withComponents = resolveComponentCopies(withTheme, dirname(absInput))
-    const withBlocks     = resolveBlockValues(withComponents)
-    const recordResult   = resolveRecordTypes(withBlocks)
+    const recordResult   = resolveRecordTypes(withComponents)
     const loadResult     = resolveDataLoads(recordResult.source, dirname(absInput))
 
     // ── RECORD errors ─────────────────────────────────────

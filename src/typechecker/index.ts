@@ -707,7 +707,7 @@ export function typeCheck(
   const hasPlugins     = program.environment.plugins.length > 0
   const componentNames = new Set(program.component.components.map(c => c.name))
 
-  // Drain parse-time warnings (e.g. RCL-023 missing terminator)
+  // Drain parse-time warnings — W-prefixed codes are warnings; others are errors
   for (const pw of program.parseWarnings) {
     const loc: SourceLocation = {
       file,
@@ -716,7 +716,11 @@ export function typeCheck(
       length: pw.loc.length,
       source: pw.loc.source,
     }
-    dc.error(pw.code, loc, pw.message, pw.hint)
+    if (pw.code.startsWith('RCL-W')) {
+      dc.warning(pw.code, loc, pw.message, pw.hint)
+    } else {
+      dc.error(pw.code, loc, pw.message, pw.hint)
+    }
   }
 
   checkStructural(program, file, dc)

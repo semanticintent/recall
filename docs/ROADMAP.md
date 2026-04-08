@@ -1,7 +1,7 @@
 # RECALL Roadmap
 
 > Last updated: April 2026
-> Current version: **0.8.9**
+> Current version: **0.8.11**
 
 ---
 
@@ -36,6 +36,8 @@ never break the contract between layers.
 | 0.8.7 | RCL-023 missing terminator + RCL-W06 uninitialised field + `valueSet` | ✅ Complete |
 | **0.8.8** | **Parser error recovery + formal grammar + per-code tests + MLD framework** | ✅ Complete |
 | **0.8.9** | **recall scaffold + component manifest (recall-ui)** | ✅ Complete |
+| **0.8.10** | **ParseWarning severity fix — W-prefixed codes emit as warnings** | ✅ Complete |
+| **0.8.11** | **VALUE HEREDOC + pipeline hardening** | ✅ Complete |
 | **1.0.0** | **Stable language + WITH INTENT + site manifest** | 🟡 In progress |
 | **post-1.0** | **Output targets + LSP + recall diff + AUDIT DIVISION** | 📋 Planned |
 
@@ -167,6 +169,55 @@ gain scaffold support.
 `src/scaffold/index.ts` contains pure functions only — no side effects, no CLI
 coupling. Designed for future extraction to `@semanticintent/recall-tools` when
 the tooling layer warrants its own package. The CLI command is a thin wrapper.
+
+---
+
+## v0.8.11 — VALUE HEREDOC + Pipeline Hardening ✅ Complete
+
+### VALUE HEREDOC
+
+New block literal form for truly opaque multi-line content. Unlike `VALUE BLOCK`, which
+strips indentation and joins content, `VALUE HEREDOC` treats everything between the
+delimiters as raw text — no interpretation, no heuristics.
+
+```cobol
+DATA DIVISION.
+   WORKING-STORAGE SECTION.
+      01 CODE-EXAMPLE PIC X VALUE HEREDOC.
+         IDENTIFICATION DIVISION.
+            PROGRAM-ID. MY-PAGE.
+
+         DATA DIVISION.
+            WORKING-STORAGE SECTION.
+               01 HERO-TITLE PIC X(60) VALUE "RECALL — the source that remembers".
+
+         PROCEDURE DIVISION.
+            RENDER.
+               DISPLAY PAGE-HERO WITH DATA HERO-TITLE.
+            STOP RUN.
+      END HEREDOC.
+```
+
+The only closer is the literal string `END HEREDOC.` — it cannot appear accidentally
+in content. Quoted strings, division headers, COPY FROM paths — all opaque.
+
+Use `VALUE BLOCK` for prose and multi-paragraph body text.
+Use `VALUE HEREDOC` for code examples, JSON fragments, or any content that contains
+RECALL syntax or embedded quotes.
+
+### Pipeline reorder
+
+`resolveBlockValues` now runs **first** in the preprocessor pipeline — before
+`resolveThemeCopies` and `resolveComponentCopies`. Block and heredoc content is
+collapsed to single-line `VALUE "..."` strings before any other preprocessor runs.
+
+**Why this matters:** The downstream preprocessors use a `".` heuristic to detect
+the end of multiline VALUE strings. Once a HEREDOC or BLOCK is collapsed, there is
+no embedded `".` for the heuristic to misread. The pipeline is now self-consistent —
+each stage sees only the literal forms it was designed to handle.
+
+Previous order: theme → component → block → record → data-loads → parse
+New order: **block → theme → component → record → data-loads → parse**
 
 ---
 
