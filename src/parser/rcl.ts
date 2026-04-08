@@ -394,7 +394,7 @@ function parseData(lines: LineEntry[], warnings: ParseWarning[]): DataDivision {
     if (line.startsWith('ITEMS SECTION'))           { section = 'ITEMS';           stack = []; continue }
     if (!section) continue
 
-    const tokens = line.replace(/\.$/, '').split(/\s+/)
+    const tokens = tokeniseLine(line.replace(/\.$/, ''))
     const level = parseInt(tokens[0], 10)
     if (isNaN(level)) continue
 
