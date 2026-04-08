@@ -861,7 +861,9 @@ function runPreprocessorPipeline(source: string, dir: string): PreprocessorResul
 
 export function parseFromSource(source: string, baseDir: string): ReturnType<typeof parse> {
   const { source: processed } = runPreprocessorPipeline(source, baseDir)
-  return parse(processed)
+  const program = parse(processed)
+  resolveIncludes(program, baseDir)
+  return program
 }
 
 // ─────────────────────────────────────────────────────────
