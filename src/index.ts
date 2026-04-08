@@ -1,7 +1,7 @@
 export { parse } from './parser/rcl.js'
 export { generate, renderStatement, registerElement } from './generator/html.js'
 export type { PluginRenderer } from './generator/html.js'
-export { compile, check, loadPlugins } from './compiler/index.js'
+export { compile, check, loadPlugins, parseFromSource } from './compiler/index.js'
 export { expand } from './expand/index.js'
 export type { ExpandOptions, ExpandResult, CompositorPayload } from './expand/index.js'
 export type { ReclProgram, IdentificationDivision, EnvironmentDivision, DataDivision, DataField, ProcedureDivision, DisplayStatement } from './parser/rcl.js'
