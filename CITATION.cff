@@ -1,0 +1,73 @@
+cff-version: 1.2.0
+message: "If you use RECALL or cite the Machine Legibility Dimensions framework, please use the metadata below."
+title: "RECALL: A COBOL-Inspired Publishing Language for the Web, and the Machine Legibility Dimensions Framework"
+abstract: >
+  RECALL is a declarative publishing language with COBOL-inspired syntax that compiles
+  to self-contained HTML. It was designed from the foundation for AI compositor use —
+  where the primary reader of source is an AI system rather than a human programmer.
+  This repository also contains the Machine Legibility Dimensions (MLD) framework
+  (v0.1), a proposed evaluation framework for notations where the primary reader
+  is an AI system. MLD is a companion to the Cognitive Dimensions of Notations
+  framework (Green & Petre, 1996) and covers properties that the human-reader
+  framework does not address: tokenisation alignment, ambiguity surface, state surface,
+  schema availability, error signal fidelity, intent density, round-trip fidelity,
+  constraint completeness, and decomposability.
+authors:
+  - family-names: Shatny
+    given-names: Michael
+    alias: semanticintent
+    website: "https://semanticintent.dev"
+repository-code: "https://github.com/semanticintent/recall-compiler"
+url: "https://semanticintent.dev"
+license: MIT
+version: 0.8.8
+date-released: "2026-04-07"
+keywords:
+  - programming language design
+  - publishing language
+  - COBOL
+  - AI composition
+  - machine legibility
+  - compiler design
+  - notation evaluation
+  - language design frameworks
+  - declarative web
+  - AI-first language design
+
+references:
+  - type: article
+    title: "Usability Analysis of Visual Programming Environments: A 'Cognitive Dimensions' Framework"
+    authors:
+      - family-names: Green
+        given-names: "Thomas R.G."
+      - family-names: Petre
+        given-names: Marian
+    journal: "Journal of Visual Languages and Computing"
+    volume: 7
+    issue: 2
+    pages: "131-174"
+    year: 1996
+
+  - type: conference-paper
+    title: "Cognitive Dimensions of Notations"
+    authors:
+      - family-names: Green
+        given-names: "Thomas R.G."
+    collection-title: "People and Computers V"
+    editors:
+      - family-names: Sutcliffe
+        given-names: A.
+      - family-names: Macaulay
+        given-names: L.
+    publisher: "Cambridge University Press"
+    pages: "443-460"
+    year: 1989
+
+  - type: article
+    title: "ReAct: Synergizing Reasoning and Acting in Language Models"
+    authors:
+      - family-names: Yao
+        given-names: Shunyu
+    journal: "arXiv preprint"
+    year: 2022
+    notes: "arXiv:2210.03629"
