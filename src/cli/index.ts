@@ -10,6 +10,7 @@ import { fixCommand } from './commands/fix.js'
 import { scaffoldCommand } from './commands/scaffold.js'
 import { expandCommand } from './commands/expand.js'
 import { crdCommand } from './commands/crd.js'
+import { manifestCommand } from './commands/manifest.js'
 
 const program = new Command()
 
@@ -62,7 +63,13 @@ Workflow:
   Validate Common Record Description (brief JSON vs DATA DIVISION):
     recall crd page.rcl --against brief.json
     recall crd page.rcl --against brief.json --format json
-    recall crd page.rcl --against brief.json --strict`)
+    recall crd page.rcl --against brief.json --strict
+
+  Print the Pipeline Manifest — unified AI entry point:
+    recall manifest                                        human-readable summary
+    recall manifest --json                                 machine-readable JSON
+    recall manifest --layer crd                            single layer
+    recall manifest --json --plugin @stratiqx/recall-components  include component list`)
 
 program.addCommand(compileCommand)
 program.addCommand(checkCommand)
@@ -75,5 +82,6 @@ program.addCommand(fixCommand)
 program.addCommand(scaffoldCommand)
 program.addCommand(expandCommand)
 program.addCommand(crdCommand)
+program.addCommand(manifestCommand)
 
 program.parse()
