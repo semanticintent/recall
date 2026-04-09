@@ -526,6 +526,71 @@ not just what the source is, but how it became that.
 
 ---
 
+### Performance Measurement & Compiler Telemetry
+
+**Goal:** Make compiler and render performance observable — per-compile metrics
+embedded in the output, and a per-case track record that accumulates over time.
+
+**Why it matters:** As the pipeline moves toward autonomous operation (model →
+brief → RECALL → deploy with no human in the middle), the quality signal shifts
+from subjective review to measurable output characteristics. Human touches per
+published case is the north star metric; the telemetry below feeds it.
+
+#### Compile-time metrics (per run)
+
+Captured automatically during `generate()` and written to brief JSON and/or
+`index.json` on every non-preview compile:
+
+| Metric | Description |
+|---|---|
+| `compile_ms` | Total time from `parseFromSource()` to HTML string (ms) |
+| `output_chars` | Character count of the final HTML |
+| `fields_populated` | Count of DATA DIVISION fields with non-empty VALUES |
+| `fields_total` | Total schema fields declared |
+| `coverage_pct` | `fields_populated / fields_total × 100` — brief completeness proxy |
+| `truncations` | Count of fields where value was truncated to PIC X(n) limit |
+
+`truncations > 0` currently a silent failure — this surfaces it.
+
+#### Per-case track record
+
+`index.json` entries gain a `meta` block alongside the existing scores:
+
+```json
+{
+  "num": "230",
+  "fetch": 3610,
+  "meta": {
+    "compile_ms": 142,
+    "output_chars": 81311,
+    "coverage_pct": 94,
+    "truncations": 0,
+    "human_touches": 1
+  }
+}
+```
+
+`human_touches` — manually incremented when a post-compile fix is applied
+(footer patch, citation revision, etc.). Tracks pipeline maturity over time.
+Target: zero for cases published after the pipeline stabilises.
+
+#### Comparative baseline
+
+At the time of writing (April 2026, v1.0.5), reference points from the
+case study pipeline:
+
+| Case | Output chars | Notes |
+|---|---|---|
+| UC-229 | — | Pre-telemetry baseline |
+| UC-230 | 81,311 | First case with DIM-TAG + citations |
+
+**Implementation note:** Metrics are captured in `generate-case-html.ts` in
+`semantic-cal-workflow-mcp` — not in the compiler itself. The compiler is a
+pure function; telemetry lives in the tool layer that calls it. This keeps
+the compiler's contract clean.
+
+---
+
 ## Element Vocabulary Status
 
 | Element | Status | Added |
