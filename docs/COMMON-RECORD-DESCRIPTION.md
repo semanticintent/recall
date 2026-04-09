@@ -1,4 +1,4 @@
-# Composition Contract
+# Common Record Description
 
 > Version: 1.0 — April 2026
 > Applies to: `@semanticintent/recall-compiler`, `@stratiqx/recall-components`,
@@ -8,7 +8,7 @@
 
 ## What It Is
 
-The **Composition Contract** is the agreed field set between three layers of the
+The **Common Record Description** is the agreed field set between three layers of the
 RECALL publishing pipeline:
 
 1. **MCP `inputSchema`** — what the AI author (Claude Desktop) receives as instructions
@@ -29,7 +29,7 @@ RECALL has three distinct schemas that must not be conflated:
 |---|---|---|---|
 | **Language Schema** | `recall schema` / `recall schema --json` | AI compositor, tooling | All valid RECALL elements, PIC types, divisions, and clauses |
 | **Component Manifest** | `components/index.json` in any plugin | `recall scaffold`, AI tooling | Field definitions, group shapes, PIC types for a specific plugin's components |
-| **Composition Contract** | MCP `inputSchema` + brief JSON + DATA DIVISION | AI author (Claude), pipeline tooling | The agreed field set between authoring, storage, and rendering for a specific publishing use case |
+| **Common Record Description** | MCP `inputSchema` + brief JSON + DATA DIVISION | AI author (Claude), pipeline tooling | The agreed field set between authoring, storage, and rendering for a specific publishing use case |
 
 These three schemas operate at different layers and should never be substituted
 for one another.
@@ -38,7 +38,7 @@ for one another.
 
 ## How It Emerged
 
-The Composition Contract was not designed upfront — it evolved through the
+The Common Record Description was not designed upfront — it evolved through the
 convergence of three independently built systems:
 
 1. **Brief JSON** came first — a way to separate research from rendering. Fields
@@ -60,9 +60,9 @@ DATA DIVISION are the same document in three syntaxes.
 
 ---
 
-## Structure of a Composition Contract
+## Structure of a Common Record Description
 
-A Composition Contract has three expression points:
+A Common Record Description has three expression points:
 
 ### 1. MCP `inputSchema` (author-facing)
 
@@ -175,11 +175,11 @@ Before calling the MCP tool, the AI author verifies:
 
 ---
 
-## Relation to Other Contracts
+## Relation to Other Schemas
 
-| Contract | Document | Scope |
+| Name | Document | Scope |
 |---|---|---|
-| Composition Contract | This document | Field agreement across authoring → storage → rendering |
-| Compositor Contract | `COMPOSITOR-CONTRACT.md` | `WITH INTENT` expansion payload between `recall expand` and an AI compositor |
-| Language Schema | `recall schema --json` | Valid RECALL syntax — elements, PIC types, clauses |
-| Component Manifest | `components/index.json` | Plugin-level field definitions for `recall scaffold` |
+| **Common Record Description** | This document | Field agreement across authoring → storage → rendering |
+| **Compositor Contract** | `COMPOSITOR-CONTRACT.md` | `WITH INTENT` expansion payload between `recall expand` and an AI compositor |
+| **Language Schema** | `recall schema --json` | Valid RECALL syntax — elements, PIC types, clauses |
+| **Component Manifest** | `components/index.json` | Plugin-level field definitions for `recall scaffold` |

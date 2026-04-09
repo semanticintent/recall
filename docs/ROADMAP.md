@@ -526,11 +526,11 @@ not just what the source is, but how it became that.
 
 ---
 
-### Composition Contract — Formal Definition
+### Common Record Description — Formal Definition
 
-**Status:** Documented. See `docs/COMPOSITION-CONTRACT.md`.
+**Status:** Documented. See `docs/COMMON-RECORD-DESCRIPTION.md`.
 
-The **Composition Contract** is the agreed field set across three pipeline layers:
+The **Common Record Description** is the agreed field set across three pipeline layers:
 MCP `inputSchema` (author-facing) → brief JSON (storage) → RECALL DATA DIVISION
 (compiler-facing). All three express the same contract in different syntaxes for
 different audiences.
@@ -541,7 +541,7 @@ Distinct from — and must not be conflated with:
 |---|---|
 | **Language Schema** | `recall schema` — valid RECALL elements, PIC types, divisions |
 | **Component Manifest** | `components/index.json` — plugin field definitions for `recall scaffold` |
-| **Composition Contract** | `inputSchema` + brief JSON + DATA DIVISION — field agreement for a publishing use case |
+| **Common Record Description** | `inputSchema` + brief JSON + DATA DIVISION — field agreement for a publishing use case |
 
 **Planned tooling (post-1.0):** `recall contract check` — validates that a brief
 JSON and a DATA DIVISION are consistent with each other and with a declared
