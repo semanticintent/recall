@@ -406,6 +406,52 @@ export const CODES: Record<string, CodeDefinition> = {
     seeAlso:     ['RCL-027'],
   },
 
+  // ── Common Record Description (CRD) ─────────────────
+
+  'CRD-001': {
+    code:        'CRD-001',
+    severity:    'error',
+    category:    'unknown-identifier',
+    message:     'Brief field has no matching DATA DIVISION declaration',
+    description: 'A field present in the brief JSON has no corresponding PIC X declaration in the RECALL DATA DIVISION. The value will be silently ignored at compile time.',
+    example:     '* brief.json has "CASE-ORIGIN": "D5"\n* DATA DIVISION has no CASE-ORIGIN field',
+    fix:         'Add the field to the DATA DIVISION in the tool that generates the RCL, or remove it from the brief JSON if it is unused.',
+    seeAlso:     ['CRD-002'],
+  },
+
+  'CRD-002': {
+    code:        'CRD-002',
+    severity:    'error',
+    category:    'missing-required',
+    message:     'DATA DIVISION field has no corresponding brief value',
+    description: 'A field declared in the RECALL DATA DIVISION has no matching entry in the brief JSON. The field will render as empty in the compiled HTML.',
+    example:     '* DATA DIVISION declares CASE-HEADLINE PIC X(100)\n* brief.json has no "CASE-HEADLINE" key',
+    fix:         'Populate the field in the brief JSON before compiling, or mark it optional in the Common Record Description.',
+    seeAlso:     ['CRD-001'],
+  },
+
+  'CRD-003': {
+    code:        'CRD-003',
+    severity:    'warning',
+    category:    'value-constraint',
+    message:     'Brief value exceeds PIC X(n) — will truncate at compile time',
+    description: 'A brief JSON value is longer than the PIC X(n) limit declared in the DATA DIVISION. The value will be silently truncated when the RCL is compiled. No error is raised at compile time.',
+    example:     '* DATA DIVISION: SECTION-1-BODY PIC X(800)\n* brief.json "SECTION-1-BODY" is 1,240 chars — truncated to 800',
+    fix:         'Either shorten the value, or increase the PIC X(n) limit in the tool that generates the DATA DIVISION.',
+    seeAlso:     ['RCL-002'],
+  },
+
+  'CRD-004': {
+    code:        'CRD-004',
+    severity:    'error',
+    category:    'group-shape',
+    message:     'Group cardinality mismatch — brief array length ≠ DATA DIVISION group rows',
+    description: 'A brief JSON array has a different number of items than the DATA DIVISION has group rows for that field. Extra brief items will be dropped; missing DATA rows will render empty.',
+    example:     '* brief.json DIMENSIONS has 6 items\n* DATA DIVISION has DIMENSIONS-1 through DIMENSIONS-4 (4 rows)',
+    fix:         'Align the array length in the brief JSON with the number of group rows generated in the DATA DIVISION.',
+    seeAlso:     ['CRD-001'],
+  },
+
   'RCL-W05': {
     code:        'RCL-W05',
     severity:    'warning',
