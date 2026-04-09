@@ -1,7 +1,7 @@
 # RECALL Roadmap
 
 > Last updated: April 2026
-> Current version: **1.0.2**
+> Current version: **1.0.7**
 
 ---
 
@@ -40,6 +40,9 @@ never break the contract between layers.
 | **0.8.11** | **VALUE HEREDOC + pipeline hardening** | ✅ Complete |
 | **0.9.0** | **DATA COPY — COPY FROM in DATA DIVISION** | ✅ Complete |
 | **1.0.0** | **WITH INTENT — AI composition primitive + recall expand** | ✅ Complete |
+| **1.0.2** | **COMMENT keyword collision fix + parser stability** | ✅ Complete |
+| **1.0.6** | **Common Record Description — `recall crd` validator** | ✅ Complete |
+| **1.0.7** | **Pipeline Manifest — `recall manifest` unified AI entry point** | ✅ Complete |
 | **post-1.0** | **Output targets + LSP + recall diff + AUDIT DIVISION** | 📋 Planned |
 
 ---
@@ -526,9 +529,9 @@ not just what the source is, but how it became that.
 
 ---
 
-### Common Record Description — Formal Definition
+### Common Record Description ✅ Complete — v1.0.6
 
-**Status:** Documented. See `docs/COMMON-RECORD-DESCRIPTION.md`.
+**Status:** Implemented. See `docs/COMMON-RECORD-DESCRIPTION.md`.
 
 The **Common Record Description** is the agreed field set across three pipeline layers:
 MCP `inputSchema` (author-facing) → brief JSON (storage) → RECALL DATA DIVISION
@@ -543,16 +546,25 @@ Distinct from — and must not be conflated with:
 | **Component Manifest** | `components/index.json` — plugin field definitions for `recall scaffold` |
 | **Common Record Description** | `inputSchema` + brief JSON + DATA DIVISION — field agreement for a publishing use case |
 
-**Planned tooling (post-1.0):** `recall contract check` — validates that a brief
-JSON and a DATA DIVISION are consistent with each other and with a declared
-`inputSchema`. Catches field name mismatches, PIC X length violations that would
-truncate silently, and missing required fields before the compile step runs.
+**Shipped as `recall crd`** — validates that a brief JSON and a DATA DIVISION are
+consistent with each other. Catches field name mismatches, PIC X length violations
+that would truncate silently, and group cardinality mismatches before the compile
+step runs. Four diagnostic codes: CRD-001 through CRD-004. Output modes: text
+(default), `--format json`, `--strict`, `--quiet`.
 
 ---
 
-### Pipeline Manifest — Unified AI Entry Point
+### Pipeline Manifest ✅ Complete — v1.0.7
 
-**Goal:** A single machine-readable + human-readable declaration that unites all
+**Shipped as `recall manifest`** — assembles all four pipeline schema layers
+(Language Schema, Component Manifest, Common Record Description, Compositor
+Contract) into one machine-readable payload. The language schema is always inlined.
+Component names populate when `--plugin <package>` is given. Supports `--layer`
+for single-layer output and `--json` for AI consumption.
+
+---
+
+**Original goal:** A single machine-readable + human-readable declaration that unites all
 four schema layers into one document an AI orchestrator can read before touching
 anything in the pipeline.
 
