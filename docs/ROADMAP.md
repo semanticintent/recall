@@ -550,6 +550,70 @@ truncate silently, and missing required fields before the compile step runs.
 
 ---
 
+### Pipeline Manifest — Unified AI Entry Point
+
+**Goal:** A single machine-readable + human-readable declaration that unites all
+four schema layers into one document an AI orchestrator can read before touching
+anything in the pipeline.
+
+**The problem it solves:** Right now an AI agent must know to read four separate
+documents — Language Schema, Component Manifest, Common Record Description, and
+Compositor Contract — in the right order, to understand the full pipeline. That
+coordination cost lands on the prompt or SKILL file. A Pipeline Manifest makes
+the answer to "what are the rules here?" a single read.
+
+**Command:**
+
+```sh
+recall manifest              # human-readable summary
+recall manifest --json       # machine-readable JSON for AI consumption
+recall manifest --layer crd  # single layer only
+```
+
+**Output shape:**
+
+```json
+{
+  "schema": "recall-manifest/1.0",
+  "philosophy": "Structured publishing language. Source is the artifact. AI authors, compiler renders, human reviews.",
+  "layers": {
+    "language": {
+      "command": "recall schema --json",
+      "purpose": "All valid RECALL elements, PIC types, divisions, and clauses"
+    },
+    "components": {
+      "manifest": "@stratiqx/recall-components/components/index.json",
+      "purpose": "Field definitions and group shapes for available plugin components"
+    },
+    "crd": {
+      "document": "docs/COMMON-RECORD-DESCRIPTION.md",
+      "purpose": "Field agreement across MCP inputSchema, brief JSON, and DATA DIVISION"
+    },
+    "compositor": {
+      "document": "docs/COMPOSITOR-CONTRACT.md",
+      "purpose": "WITH INTENT expansion protocol between recall expand and an AI compositor"
+    }
+  },
+  "methodology": {
+    "authoring":  "AI assembles brief against Common Record Description",
+    "rendering":  "RECALL compiler + plugin renderers produce self-contained HTML",
+    "validation": "inputSchema descriptions enforce field discipline at authoring time",
+    "provenance": "brief JSON persisted alongside HTML — source always recoverable"
+  }
+}
+```
+
+**Why it completes the architecture:** An orchestrating agent — whether Claude
+Desktop, an autonomous cluster pipeline, or a future agent in a new environment —
+needs one document that carries the institutional knowledge of the pipeline.
+The manifest is that document. It travels with the pipeline regardless of context,
+model, or tool.
+
+**Grace Hopper's name for it (1959):** Program Library Directory — the catalogue
+of what exists and what contract each entry honours.
+
+---
+
 ### Performance Measurement & Compiler Telemetry
 
 **Goal:** Make compiler and render performance observable — per-compile metrics
