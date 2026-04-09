@@ -1369,3 +1369,66 @@ export function check(inputPath: string, opts: CheckOptions = {}): CheckResult {
     return { ok: false, inputPath: absInput, errors: [`PARSE ERROR: ${msg}`], warningMessages: [] }
   }
 }
+
+// ─────────────────────────────────────────────────────────
+// compileFromSource — in-memory compilation (no file I/O)
+// Suitable for Workers, playgrounds, and programmatic use.
+// Runs HEREDOC resolution → parse → typecheck → generate.
+// COPY FROM / LOAD FROM are not resolved (no baseDir).
+// ─────────────────────────────────────────────────────────
+
+export interface SourceDiagnostic {
+  code:     string
+  severity: 'error' | 'warning'
+  message:  string
+  why:      string
+  line:     number
+  col:      number
+}
+
+export interface CompileFromSourceResult {
+  ok:          boolean
+  html?:       string
+  error?:      string
+  diagnostics: SourceDiagnostic[]
+}
+
+export function compileFromSource(source: string, opts: CompileOptions = {}): CompileFromSourceResult {
+  let processed: string
+  try {
+    processed = resolveBlockValues(source)
+  } catch (err) {
+    return { ok: false, error: `PREPROCESSOR ERROR: ${(err as Error).message}`, diagnostics: [] }
+  }
+
+  let program
+  try {
+    program = parse(processed)
+  } catch (err) {
+    return { ok: false, error: `PARSE ERROR: ${(err as Error).message}`, diagnostics: [] }
+  }
+
+  const dc = typeCheck(program, '<source>', { strict: opts.strict ?? false })
+
+  const diagnostics: SourceDiagnostic[] = dc.getAll().map(d => ({
+    code:     d.code,
+    severity: d.severity,
+    message:  d.message,
+    why:      d.why,
+    line:     d.location.line,
+    col:      d.location.col,
+  }))
+
+  if (dc.hasErrors()) {
+    return { ok: false, error: 'Type errors found', diagnostics }
+  }
+
+  let html: string
+  try {
+    html = generate(program, source)
+  } catch (err) {
+    return { ok: false, error: `GENERATION ERROR: ${(err as Error).message}`, diagnostics }
+  }
+
+  return { ok: true, html, diagnostics }
+}

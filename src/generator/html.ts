@@ -3,8 +3,11 @@
 // ─────────────────────────────────────────────────────────
 
 import { createRequire } from 'module'
-const _require = createRequire(import.meta.url)
-const RECALL_VERSION: string = (_require('../../package.json') as { version: string }).version
+let RECALL_VERSION = '1.0.x'
+try {
+  const _require = createRequire(import.meta.url)
+  RECALL_VERSION = (_require('../../package.json') as { version: string }).version
+} catch { /* Workers / bundled environments without filesystem */ }
 
 import type {
   ReclProgram,
