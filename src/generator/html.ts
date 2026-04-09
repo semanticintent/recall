@@ -981,7 +981,7 @@ document.querySelectorAll('.code-copy-btn').forEach(function(btn) {
   ${id.favicon    ? `<link rel="icon" href="${escapeHtml(id.favicon)}">` : ''}${ogMeta}
   <style>
 ${css}
-  </style>${themeOverrides ? `\n  <style id="theme-overrides">\n${themeOverrides}\n  </style>` : ''}
+  </style>${themeOverrides ? `\n  <style id="theme-overrides">\n  :root { ${themeOverrides} }\n  </style>` : ''}
 </head>
 <body id="${id.programId.toLowerCase()}">
 ${body}
