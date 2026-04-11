@@ -1,7 +1,7 @@
 # RECALL Roadmap
 
 > Last updated: April 2026
-> Current version: **1.0.7**
+> Current version: **1.1.0**
 
 ---
 
@@ -43,7 +43,8 @@ never break the contract between layers.
 | **1.0.2** | **COMMENT keyword collision fix + parser stability** | ✅ Complete |
 | **1.0.6** | **Common Record Description — `recall crd` validator** | ✅ Complete |
 | **1.0.7** | **Pipeline Manifest — `recall manifest` unified AI entry point** | ✅ Complete |
-| **post-1.0** | **Output targets + LSP + recall diff + AUDIT DIVISION** | 📋 Planned |
+| **1.1.0** | **recall diff + AUDIT DIVISION + LSP (`@semanticintent/recall-lsp`) + recall stats pipeline telemetry** | ✅ Complete |
+| **post-1.1** | **Output targets + recall serve + recall validate + recall import + recall test + GitHub Action + formal standard + semantic versioning** | 📋 Planned |
 
 ---
 
@@ -419,10 +420,79 @@ lesson applied correctly before the feature ships.
 
 ---
 
-## Post-1.0 — Language Maturity
+## v1.1.0 — Provenance, Semantic Diff, and Editor Support ✅ Complete
 
-Features that extend the philosophy without changing the foundation. Planned after
-the language is stable and the AI-first thesis is implemented.
+**Theme:** The source that remembers who wrote it.
+
+### recall diff — Semantic AST Diff
+
+AST-level diff between two `.rcl` sources — not a text diff. Reports field renames,
+PIC type changes, value changes, added/removed DISPLAY statements, IDENTIFICATION
+changes. Supports two-file and git revision syntax.
+
+```sh
+recall diff v1.rcl v2.rcl
+recall diff HEAD~1 HEAD page.rcl
+recall diff HEAD~1 HEAD page.rcl --suggest-audit   # ready-made CHANGE-LOG entry
+recall diff --format json v1.rcl v2.rcl
+```
+
+### AUDIT DIVISION
+
+Formal provenance as a language construct. Sixth optional division, declared after
+PROCEDURE DIVISION. CREATED-BY is constrained to exactly three values: `Human`,
+`AI compositor`, `AI agent` — anything else is RCL-030 (compile error).
+
+```cobol
+AUDIT DIVISION.
+   CREATED-BY.   Human.
+   CREATED-DATE. 2026-04-11.
+   CHANGE-LOG.
+      2026-04-11 "Human"         "Initial authoring.".
+      2026-04-11 "AI compositor" "Expanded WITH INTENT block.".
+```
+
+Compiles into a structured HTML comment in every artifact. New diagnostic codes:
+RCL-028 (bad CREATED-DATE), RCL-029 (change entry before CREATED-DATE), RCL-030
+(invalid author kind), RCL-W11 (empty CHANGE-LOG).
+
+### LSP — `@semanticintent/recall-lsp@0.1.0`
+
+Full Language Server Protocol implementation. Diagnostics, autocomplete, hover,
+go-to-definition, rename. stdio/IPC transport — works with VS Code, Cursor, Neovim,
+JetBrains. Copilot and Cursor consume LSP data, making RECALL field types and
+diagnostic codes visible to AI coding assistants.
+
+`recall-vscode` extension built on top — TextMate grammar, LSP client. VS Code
+Marketplace publish deferred.
+
+### recall stats — Pipeline Telemetry Mode
+
+`recall stats` with no file argument reads `index.json` and aggregates compile_ms,
+coverage_pct, truncations, and human_touches across all compiled cases.
+
+### Playground WITH INTENT Expand ✅ Live
+
+`recall-compiler-api` Worker ships `POST /expand` — parses the source, walks WITH
+INTENT statements, calls Workers AI (Llama 3.3 70B fp8-fast) with a structured
+payload, caches results in KV (7-day TTL), rewrites source, returns expanded `.rcl`.
+Playground wires an Expand ✦ button (shown only when WITH INTENT is present) that
+calls the endpoint and re-compiles the expanded source live. Reset button restores
+the original.
+
+### DOI
+
+`semanticintent/recall-compiler` — DOI: `10.5281/zenodo.19463347`
+
+Covers the compiler architecture, MLD framework, EMBER/RECALL relationship, and
+formal grammar. Update candidates for v1.2: AUDIT DIVISION spec, recall diff schema,
+LSP architecture.
+
+---
+
+## Post-1.1 — Language Maturity
+
+Features that extend the philosophy without changing the foundation.
 
 ---
 
@@ -742,4 +812,198 @@ semantic value.
 
 RECALL requires a complete program structure to compile. A `--draft` mode that
 compiles with missing or empty fields using placeholder content would make early
-authoring faster without changing the language. Planned post-1.0.
+authoring faster without changing the language. Planned post-1.1.
+
+---
+
+## Post-1.1 — Next Level
+
+The items below were identified after v1.1.0 shipped. Each extends the core
+philosophy without changing the language contract.
+
+---
+
+### `recall validate` — The Artifact Validates Itself
+
+**Goal:** Every compiled RECALL HTML embeds its own `.rcl` source in a comment.
+`recall validate page.html` extracts that source, recompiles it, and verifies the
+output matches the live file. A deployed page that can prove it was not tampered with
+after compilation.
+
+```sh
+recall validate page.html           # recompile embedded source, diff against file
+recall validate https://example.com/page.html  # validate a live URL
+```
+
+**Why it's next level:** "Source is the artifact" taken to its logical conclusion.
+No other publishing language has this. Also opens a CI gate: validate the deployed
+HTML directly, not the source.
+
+**New diagnostic codes:** VALID-001 (source/output mismatch), VALID-002 (no
+embedded source found).
+
+---
+
+### `recall serve` — Dev Server
+
+**Goal:** A file-watching dev server that recompiles `.rcl` on save and hot-reloads
+the browser. Not a runtime — a dev loop.
+
+```sh
+recall serve src/              # watch all .rcl, serve compiled HTML on localhost:4321
+recall serve index.rcl         # single file
+recall serve src/ --port 8080
+```
+
+**Why it matters:** The current authoring loop is compile → open file → refresh.
+`recall serve` collapses that to save → see. The single biggest friction in day-to-day
+authoring. Compiler remains a pure function — the server is a thin wrapper.
+
+---
+
+### `recall import` — Convert HTML or Markdown to RECALL
+
+**Goal:** Take an existing HTML page or Markdown file and produce a compilable `.rcl`.
+AI-assisted extraction: prose becomes DATA DIVISION fields, headings become PIC X
+fields, structured content maps to ITEMS groups.
+
+```sh
+recall import page.html --out page.rcl
+recall import README.md --out page.rcl
+recall import https://example.com --out page.rcl
+```
+
+**Why it matters:** The single biggest adoption barrier is "I have an existing page,
+where do I start?" `recall import` answers it. Output is annotated with COMMENT
+clauses from the AI extraction pass — the imported source is immediately legible.
+
+---
+
+### `recall test` — Content Assertions
+
+**Goal:** A test layer above the type checker. Author-declared content quality rules
+that run at compile time (or as a separate `recall test` pass).
+
+```cobol
+TEST DIVISION.
+   ASSERT HERO-HEADING LENGTH BETWEEN 10 AND 60.
+   ASSERT CTA-LABEL NOT CONTAINS "click here".
+   ASSERT all PIC URL RESOLVES.
+   ASSERT AUDIT DIVISION PRESENT.
+```
+
+```sh
+recall test page.rcl           # run assertions, exit 1 on failure
+recall test page.rcl --format json
+```
+
+**Why it extends the philosophy:** The type checker enforces structural validity.
+TEST DIVISION enforces content quality. Together: if it compiles and passes tests, it
+is both valid and meets the author's stated standard. CI-friendly. New division,
+new diagnostic namespace (RCL-T01...).
+
+---
+
+### Semantic Versioning of Content
+
+**Goal:** Extend AUDIT DIVISION with a `VERSION.` field in IDENTIFICATION DIVISION.
+`recall diff --semver` analyses the diff and suggests a semantic version bump:
+
+- **patch** — value changes only (copy edits)
+- **minor** — fields added, no removals
+- **major** — fields removed, PIC type changes, structural changes
+
+```cobol
+IDENTIFICATION DIVISION.
+   PROGRAM-ID.   MY-SITE.
+   VERSION.      1.2.0.
+```
+
+```sh
+recall diff HEAD~1 HEAD page.rcl --semver
+# → SUGGESTED BUMP: minor (2 fields added, 0 removed)
+```
+
+**Why it matters:** Page content gets the same versioning discipline as software
+packages. Pairs with AUDIT DIVISION — the version tells you what changed, the AUDIT
+DIVISION tells you who changed it.
+
+---
+
+### GitHub Action — `semanticintent/recall-action`
+
+**Goal:** Official CI integration as a published GitHub Action.
+
+```yaml
+- uses: semanticintent/recall-action@v1
+  with:
+    check: strict
+    validate-audit: true
+    post-diagnostics: true    # post compile diagnostics as PR comment
+```
+
+Runs `recall check --strict` on every push. Optionally posts compile telemetry as PR
+comments. Validates AUDIT DIVISION presence and date consistency against git history.
+
+**Why it matters:** This is how a language becomes a serious professional tool — not
+through features but through integration. The same path ESLint and Prettier took.
+
+---
+
+### Formal Language Standard
+
+**Goal:** Position RECALL as a published specification, not just a compiler project.
+The DOI (`10.5281/zenodo.19463347`) already archives the compiler. The next step is
+a separate formal spec document — `RECALL-SPEC.md` / `RECALL-SPEC-1.1.pdf` — that
+any implementation could conform to.
+
+**What the spec covers:**
+- Full EBNF grammar (already in `RECALL-GRAMMAR.md` — promote to normative)
+- Division semantics and ordering rules
+- PIC type system and validation rules
+- AUDIT DIVISION author-kind constraint
+- Diagnostic code registry (stable identifiers, not implementation details)
+- Compositor Contract (WITH INTENT expansion protocol)
+
+**Update candidates for current DOI (v1.2 Zenodo version):**
+- AUDIT DIVISION specification
+- `recall diff` schema (`recall-diff/1.0`)
+- LSP architecture and capability surface
+- v1.1.0 diagnostic additions (RCL-028/029/030/W11)
+
+**Why it matters:** A spec document separates the language from the implementation.
+Other tools (AI agents, alternative compilers, validators) can conform to RECALL
+without depending on `@semanticintent/recall-compiler`. This is how a language
+outlives its first implementation.
+
+---
+
+### `AUTOLEN` Modifier
+
+**Goal:** Opt a field out of `PIC X(n)` length enforcement for long-form content
+where the length constraint adds friction without semantic value.
+
+```cobol
+01 BODY-TEXT PIC X AUTOLEN VALUE "...any length string...".
+```
+
+The compiler sizes the field to fit, no truncation warning, no RCL-002. Designed for
+body copy, article text, and any field where the author cannot predict the exact
+character count at declaration time.
+
+---
+
+### `--draft` Mode
+
+**Goal:** Compile with missing or empty DATA DIVISION fields using placeholder content.
+Allows authoring the structure before filling in the values.
+
+```sh
+recall compile page.rcl --draft
+# Fields with no VALUE render as "[FIELD-NAME]" placeholders
+# Structural errors still abort. Missing values do not.
+```
+
+**Why it matters:** Removes the blank-VALUE friction from early authoring. The
+author can scaffold the page structure, see how it renders, and fill in values
+incrementally.
