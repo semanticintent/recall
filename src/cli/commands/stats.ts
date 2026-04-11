@@ -1,9 +1,72 @@
 import { Command } from 'commander'
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { parse } from '../../parser/rcl.js'
 import { typeCheck } from '../../typechecker/index.js'
 import { inspect } from '../../compiler/index.js'
+
+// ─── Pipeline aggregate mode ─────────────────────────────
+
+interface CaseMeta {
+  compile_ms:       number
+  output_chars:     number
+  fields_populated: number
+  fields_total:     number
+  coverage_pct:     number
+  truncations:      number
+  human_touches:    number
+}
+
+function runPipelineStats(indexPath: string, opts: { json?: boolean }): void {
+  if (!existsSync(indexPath)) {
+    process.stderr.write(`index.json not found: ${indexPath}\n`)
+    process.stderr.write(`Run from a case-studies directory, or pass --index <path>\n`)
+    process.exit(1)
+  }
+
+  const cases = JSON.parse(readFileSync(indexPath, 'utf-8')) as Array<Record<string, unknown>>
+  const withMeta = cases.filter(c => c['meta']) as Array<Record<string, unknown> & { meta: CaseMeta }>
+
+  if (withMeta.length === 0) {
+    process.stdout.write('No compiled cases with telemetry meta found in index.json.\n')
+    process.stdout.write('Recompile at least one case to generate telemetry.\n')
+    return
+  }
+
+  const count         = withMeta.length
+  const avg_ms        = Math.round(withMeta.reduce((s, c) => s + c.meta.compile_ms, 0) / count)
+  const avg_chars     = Math.round(withMeta.reduce((s, c) => s + c.meta.output_chars, 0) / count)
+  const avg_coverage  = Math.round(withMeta.reduce((s, c) => s + c.meta.coverage_pct, 0) / count)
+  const total_trunc   = withMeta.reduce((s, c) => s + c.meta.truncations, 0)
+  const avg_touches   = Math.round(withMeta.reduce((s, c) => s + c.meta.human_touches, 0) / count * 10) / 10
+
+  if (opts.json) {
+    process.stdout.write(JSON.stringify({
+      compiled_cases:   count,
+      avg_compile_ms:   avg_ms,
+      avg_output_chars: avg_chars,
+      avg_coverage_pct: avg_coverage,
+      total_truncations: total_trunc,
+      avg_human_touches: avg_touches,
+    }, null, 2) + '\n')
+    return
+  }
+
+  const pad = (s: string) => s.padEnd(24)
+  const lines = [
+    '',
+    `Pipeline Telemetry  ${indexPath}`,
+    hr,
+    `  ${pad('Compiled cases:')}   ${count}`,
+    `  ${pad('Avg compile_ms:')}   ${avg_ms}`,
+    `  ${pad('Avg output_chars:')} ${avg_chars.toLocaleString()}`,
+    `  ${pad('Avg coverage_pct:')} ${avg_coverage}%`,
+    `  ${pad('Total truncations:')}${total_trunc}`,
+    `  ${pad('Avg human_touches:')}${avg_touches}`,
+    '',
+  ]
+  process.stdout.write(lines.join('\n') + '\n')
+}
 
 const hr = '─'.repeat(60)
 
@@ -23,13 +86,29 @@ function flatFields(fields: ReturnType<typeof parse>['data']['workingStorage']):
 }
 
 export const statsCommand = new Command('stats')
-  .argument('<file>', 'path to .rcl source file')
+  .argument('[file]', 'path to .rcl source file (omit for pipeline telemetry aggregate)')
   .option('--json', 'output as machine-readable JSON')
-  .description('Show a quick orientation summary of a .rcl file before editing')
+  .option('--index <path>', 'path to index.json for pipeline mode (default: uc-000/index.json in CWD)')
+  .description('Show stats for a .rcl file, or aggregate telemetry across all compiled cases')
   .addHelpText('after', `
-  Run before editing to know what you are working with:
-  field counts, groups, elements used, warnings, plugins.`)
-  .action((file: string, opts: { json?: boolean }) => {
+  Single-file orientation (run before editing):
+    recall stats page.rcl                   field counts, groups, elements, warnings
+    recall stats page.rcl --json            machine-readable summary
+
+  Pipeline telemetry (run from case-studies directory):
+    recall stats                            aggregate compile_ms, coverage, truncations
+    recall stats --json                     machine-readable aggregate
+    recall stats --index path/to/index.json explicit index path`)
+  .action((file: string | undefined, opts: { json?: boolean; index?: string }) => {
+    // No file argument — pipeline aggregate mode
+    if (!file) {
+      const indexPath = opts.index
+        ? resolve(opts.index)
+        : resolve(join(process.cwd(), 'uc-000', 'index.json'))
+      runPipelineStats(indexPath, opts)
+      return
+    }
+
     const absInput = resolve(file)
     if (!existsSync(absInput)) {
       process.stderr.write(`File not found: ${absInput}\n`)

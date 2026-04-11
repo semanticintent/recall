@@ -45,6 +45,11 @@ Workflow:
     recall stats <file>                field counts, groups, elements, warnings
     recall stats <file> --json         machine-readable summary
 
+  Pipeline telemetry (run from case-studies directory):
+    recall stats                       aggregate compile_ms, coverage, truncations
+    recall stats --json                machine-readable aggregate
+    recall stats --index <path>        explicit path to index.json
+
   Look up a diagnostic code:
     recall explain RCL-007             human-readable entry
     recall explain RCL-007 --json      machine-readable JSON
