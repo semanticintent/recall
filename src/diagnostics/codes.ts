@@ -462,6 +462,52 @@ export const CODES: Record<string, CodeDefinition> = {
     fix:         'Declare the field as PIC X if it is intended for display as text, or use LABEL which explicitly accepts numeric values.',
     seeAlso:     ['RCL-001'],
   },
+
+  // ── AUDIT DIVISION ───────────────────────────────────
+
+  'RCL-W11': {
+    code:        'RCL-W11',
+    severity:    'warning',
+    category:    'structural',
+    message:     'AUDIT DIVISION present but CHANGE-LOG is empty',
+    description: 'An AUDIT DIVISION was declared with a CHANGE-LOG. section, but no change entries were added. An empty change log provides no provenance value.',
+    example:     'AUDIT DIVISION.\n   CREATED-BY.    Author.\n   CREATED-DATE.  2026-04-10.\n   CHANGE-LOG.   ← nothing follows',
+    fix:         'Add at least one change entry, or remove the CHANGE-LOG. section if no changes have been made yet.',
+    seeAlso:     ['RCL-028'],
+  },
+
+  'RCL-028': {
+    code:        'RCL-028',
+    severity:    'error',
+    category:    'value-constraint',
+    message:     'AUDIT DIVISION CREATED-DATE is not valid ISO 8601',
+    description: 'The CREATED-DATE field in the AUDIT DIVISION must be a valid ISO 8601 date in YYYY-MM-DD format. The compiler cannot guarantee date ordering in the change log without a valid base date.',
+    example:     'CREATED-DATE.  April 10.   ← not ISO 8601',
+    fix:         'Use format YYYY-MM-DD, e.g. CREATED-DATE. 2026-04-10.',
+    seeAlso:     ['RCL-029'],
+  },
+
+  'RCL-029': {
+    code:        'RCL-029',
+    severity:    'error',
+    category:    'value-constraint',
+    message:     'Change entry date is earlier than CREATED-DATE',
+    description: 'A change entry in the AUDIT DIVISION CHANGE-LOG has a date that precedes the CREATED-DATE of the document. Change entries must be on or after the creation date.',
+    example:     'CREATED-DATE.  2026-04-10.\nCHANGE-LOG.\n   2026-03-01  HERO-HEADING updated. Human. "Too early."   ← before CREATED-DATE',
+    fix:         'Correct the change entry date, or update CREATED-DATE to reflect the actual creation date.',
+    seeAlso:     ['RCL-028'],
+  },
+
+  'RCL-030': {
+    code:        'RCL-030',
+    severity:    'error',
+    category:    'unknown-identifier',
+    message:     'Change entry author-kind is not a recognised value',
+    description: 'The author-kind in an AUDIT DIVISION change entry must be one of three recognised values: Human, AI compositor, or AI agent. These three categories formally distinguish who authored each change.',
+    example:     '2026-04-10  HERO-HEADING updated. Contractor. "..."   ← "Contractor" is not recognised',
+    fix:         'Use one of: Human, AI compositor, AI agent.',
+    seeAlso:     ['RCL-028'],
+  },
 }
 
 export function getCode(code: string): CodeDefinition {

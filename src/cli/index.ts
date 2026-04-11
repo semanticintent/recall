@@ -12,6 +12,7 @@ import { expandCommand } from './commands/expand.js'
 import { crdCommand } from './commands/crd.js'
 import { manifestCommand } from './commands/manifest.js'
 import { diffCommand } from './commands/diff.js'
+import { auditCommand } from './commands/audit.js'
 
 const program = new Command()
 
@@ -55,6 +56,12 @@ Workflow:
     recall diff v1.rcl v2.rcl          compare two files
     recall diff HEAD~1 HEAD page.rcl   compare git revisions
     recall diff --format json v1.rcl v2.rcl  machine-readable output
+    recall diff HEAD~1 HEAD page.rcl --suggest-audit  suggest an AUDIT DIVISION entry
+
+  AUDIT DIVISION — provenance and change log:
+    recall audit page.rcl              print change log
+    recall audit page.rcl --since 2026-04-08  filter by date
+    recall audit page.rcl --format json  machine-readable
 
   Look up a diagnostic code:
     recall explain RCL-007             human-readable entry
@@ -95,5 +102,6 @@ program.addCommand(expandCommand)
 program.addCommand(crdCommand)
 program.addCommand(manifestCommand)
 program.addCommand(diffCommand)
+program.addCommand(auditCommand)
 
 program.parse()

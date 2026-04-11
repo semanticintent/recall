@@ -756,8 +756,60 @@ export function typeCheck(
   checkUnexpandedIntents(program, file, dc)
   checkStatements(program, symbols, file, hasPlugins, componentNames, dc)
   checkComponents(program, symbols, file, dc)
+  checkAuditDivision(program, file, dc)
 
   if (opts.strict) dc.promoteWarnings()
 
   return dc
+}
+
+// ─────────────────────────────────────────────────────────
+// AUDIT DIVISION checks
+// RCL-W11  AUDIT present but CHANGE-LOG is empty
+// RCL-028  CREATED-DATE is not valid ISO 8601
+// RCL-029  Change entry date is earlier than CREATED-DATE
+// RCL-030  Change entry author-kind unrecognised (emitted by parser)
+// ─────────────────────────────────────────────────────────
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function checkAuditDivision(
+  program: ReclProgram,
+  file:    string,
+  dc:      DiagnosticCollector,
+): void {
+  const audit = program.audit
+  if (!audit) return
+
+  const fallback: SourceLocation = { file, line: 1, col: 1, length: 1, source: '' }
+
+  // RCL-028 — CREATED-DATE must be ISO 8601
+  if (!ISO_DATE_RE.test(audit.createdDate)) {
+    dc.error('RCL-028', fallback,
+      `AUDIT DIVISION CREATED-DATE "${audit.createdDate}" is not valid ISO 8601`,
+      `Use format YYYY-MM-DD, e.g. 2026-04-10`,
+    )
+  }
+
+  // RCL-W11 — AUDIT present but CHANGE-LOG is empty
+  if (audit.changeLog.length === 0) {
+    dc.warning('RCL-W11', fallback,
+      `AUDIT DIVISION is present but CHANGE-LOG is empty`,
+      `Add at least one change entry, or remove the CHANGE-LOG. section`,
+    )
+  }
+
+  // RCL-029 — change entry date must not be earlier than CREATED-DATE
+  for (const entry of audit.changeLog) {
+    if (!ISO_DATE_RE.test(entry.date)) continue  // malformed dates caught at parse time
+    if (audit.createdDate && ISO_DATE_RE.test(audit.createdDate) && entry.date < audit.createdDate) {
+      const loc: SourceLocation = entry.loc
+        ? { file, line: entry.loc.line, col: entry.loc.col, length: entry.loc.length, source: entry.loc.source }
+        : fallback
+      dc.error('RCL-029', loc,
+        `Change entry date "${entry.date}" is earlier than CREATED-DATE "${audit.createdDate}"`,
+        `Change entries must be on or after the CREATED-DATE`,
+      )
+    }
+  }
 }

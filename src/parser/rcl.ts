@@ -2,7 +2,7 @@
 // RECALL Parser — .rcl source → ReclProgram AST
 // ─────────────────────────────────────────────────────────
 
-export type Division = 'IDENTIFICATION' | 'ENVIRONMENT' | 'DATA' | 'PROCEDURE' | 'COMPONENT'
+export type Division = 'IDENTIFICATION' | 'ENVIRONMENT' | 'DATA' | 'PROCEDURE' | 'COMPONENT' | 'AUDIT'
 
 // ─────────────────────────────────────────────────────────
 // Source location — attached to every AST node
@@ -33,6 +33,7 @@ export interface ReclProgram {
   environment:    EnvironmentDivision
   data:           DataDivision
   component:      ComponentDivision
+  audit?:         AuditDivision    // optional — present only when AUDIT DIVISION appears in source
   procedure:      ProcedureDivision
   parseWarnings:  ParseWarning[]   // diagnostics emitted during parsing, drained by typeCheck()
 }
@@ -99,6 +100,22 @@ export interface ComponentDef {
 
 export interface ComponentDivision {
   components: ComponentDef[]
+}
+
+export type AuditAuthorKind = 'Human' | 'AI compositor' | 'AI agent'
+
+export interface AuditChangeEntry {
+  date:       string           // ISO 8601 date
+  subject:    string           // field or section name
+  authorKind: AuditAuthorKind
+  note:       string
+  loc?:       NodeLocation
+}
+
+export interface AuditDivision {
+  createdBy:   string
+  createdDate: string          // ISO 8601 date
+  changeLog:   AuditChangeEntry[]
 }
 
 export type DisplayElement =
@@ -254,6 +271,7 @@ function detectDivision(line: string): Division | null {
   if (t.startsWith('ENVIRONMENT DIVISION'))   return 'ENVIRONMENT'
   if (t.startsWith('DATA DIVISION'))          return 'DATA'
   if (t.startsWith('COMPONENT DIVISION'))     return 'COMPONENT'
+  if (t.startsWith('AUDIT DIVISION'))         return 'AUDIT'
   if (t.startsWith('PROCEDURE DIVISION'))     return 'PROCEDURE'
   return null
 }
@@ -678,6 +696,98 @@ function parseComponentDivision(lines: LineEntry[]): ComponentDivision {
 }
 
 // ─────────────────────────────────────────────────────────
+// AUDIT DIVISION parser
+// ─────────────────────────────────────────────────────────
+
+const AUDIT_AUTHOR_KINDS: AuditAuthorKind[] = ['Human', 'AI compositor', 'AI agent']
+
+/**
+ * Parse an AUDIT DIVISION line-bucket into an AuditDivision node.
+ *
+ * Syntax reminder:
+ *   CREATED-BY.   Michael Shatny.
+ *   CREATED-DATE. 2026-04-07.
+ *   CHANGE-LOG.
+ *      2026-04-07  HERO-HEADING updated. Human. "Sharpened the opening line."
+ */
+function parseAuditDivision(lines: LineEntry[], warnings: ParseWarning[]): AuditDivision {
+  let createdBy   = ''
+  let createdDate = ''
+  const changeLog: AuditChangeEntry[] = []
+  let inChangeLog = false
+
+  for (const { raw, lineNum } of lines) {
+    const line = cleanLine(raw)
+    if (!line) continue
+
+    if (line.startsWith('CREATED-BY.')) {
+      createdBy = line.replace(/^CREATED-BY\.\s*/, '').replace(/\.$/, '').trim()
+      inChangeLog = false
+      continue
+    }
+    if (line.startsWith('CREATED-DATE.')) {
+      createdDate = line.replace(/^CREATED-DATE\.\s*/, '').replace(/\.$/, '').trim()
+      inChangeLog = false
+      continue
+    }
+    if (line.startsWith('CHANGE-LOG.') || line === 'CHANGE-LOG') {
+      inChangeLog = true
+      continue
+    }
+
+    if (!inChangeLog) continue
+
+    // Change log entry:  2026-04-07  HERO-HEADING updated. Human. "Note."
+    // Date is first token (ISO 8601), then subject words until author-kind, then quoted note
+    const isoDate = /^(\d{4}-\d{2}-\d{2})\s+(.+)$/.exec(line)
+    if (!isoDate) continue
+
+    const date    = isoDate[1]
+    const rest    = isoDate[2]
+
+    // Find which author-kind appears — longest match first to avoid 'AI' matching 'AI compositor'
+    const sortedKinds = [...AUDIT_AUTHOR_KINDS].sort((a, b) => b.length - a.length)
+    let authorKind: AuditAuthorKind | null = null
+    let subjectPart = rest
+    let afterAuthor = ''
+
+    for (const kind of sortedKinds) {
+      const idx = rest.indexOf(kind)
+      if (idx >= 0) {
+        authorKind  = kind
+        subjectPart = rest.slice(0, idx).replace(/\.\s*$/, '').trim()
+        afterAuthor = rest.slice(idx + kind.length).replace(/^\.\s*/, '').trim()
+        break
+      }
+    }
+
+    if (!authorKind) {
+      warnings.push({
+        code:    'RCL-030',
+        message: `AUDIT CHANGE-LOG entry has unrecognised author-kind`,
+        hint:    `Valid values: Human, AI compositor, AI agent`,
+        loc:     makeLoc(lineNum, raw, date),
+      })
+      continue
+    }
+
+    // Extract quoted note
+    const noteMatch = /"([^"]*)"/.exec(afterAuthor)
+    const note = noteMatch ? noteMatch[1] : ''
+
+    changeLog.push({
+      date,
+      subject: subjectPart,
+      authorKind,
+      note,
+      loc: makeLoc(lineNum, raw, date),
+    })
+  }
+
+  return { createdBy, createdDate, changeLog }
+}
+
+// ─────────────────────────────────────────────────────────
 // Main parse entry point
 // ─────────────────────────────────────────────────────────
 
@@ -689,6 +799,7 @@ export function parse(source: string): ReclProgram {
     ENVIRONMENT:    [],
     DATA:           [],
     COMPONENT:      [],
+    AUDIT:          [],
     PROCEDURE:      [],
   }
 
@@ -721,11 +832,15 @@ export function parse(source: string): ReclProgram {
   const { division: procedure, warnings: procWarnings } = parseProcedure(buckets.PROCEDURE)
   parseWarnings.push(...procWarnings)
 
+  const auditRaw = parseAuditDivision(buckets.AUDIT, parseWarnings)
+  const audit = buckets.AUDIT.length > 0 ? auditRaw : undefined
+
   return {
     identification: parseIdentification(buckets.IDENTIFICATION),
     environment:    parseEnvironment(buckets.ENVIRONMENT),
     data:           parseData(buckets.DATA, parseWarnings),
     component:      parseComponentDivision(buckets.COMPONENT),
+    audit,
     procedure,
     parseWarnings,
   }

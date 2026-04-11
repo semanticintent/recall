@@ -99,6 +99,7 @@ export const diffCommand = new Command('diff')
   .argument('<b>', 'second file path, or git ref when three arguments given')
   .argument('[file]', 'path to .rcl file when comparing git revisions')
   .option('--format <fmt>', 'output format: text (default) or json', 'text')
+  .option('--suggest-audit', 'print a suggested AUDIT DIVISION CHANGE-LOG entry for the detected changes')
   .addHelpText('after', `
   Compare two files:
     recall diff v1.rcl v2.rcl
@@ -108,8 +109,11 @@ export const diffCommand = new Command('diff')
 
   Machine-readable output:
     recall diff --format json v1.rcl v2.rcl
-    recall diff --format json HEAD~1 HEAD page.rcl`)
-  .action((a: string, b: string, file: string | undefined, opts: { format: string }) => {
+    recall diff --format json HEAD~1 HEAD page.rcl
+
+  Suggest an AUDIT DIVISION entry for the changes found:
+    recall diff HEAD~1 HEAD page.rcl --suggest-audit`)
+  .action((a: string, b: string, file: string | undefined, opts: { format: string; suggestAudit?: boolean }) => {
     let sourceA: string
     let sourceB: string
     let fromLabel: string
@@ -140,5 +144,28 @@ export const diffCommand = new Command('diff')
       process.stdout.write(JSON.stringify(result, null, 2) + '\n')
     } else {
       process.stdout.write(formatDiff(result))
+    }
+
+    if (opts.suggestAudit && result.changes.length > 0) {
+      const today = new Date().toISOString().slice(0, 10)
+
+      // Summarise what changed: field names + section names
+      const dataChanges = result.changes
+        .filter((c): c is DataChange => c.division === 'DATA')
+        .map(c => `${c.field} ${c.operation}`)
+      const procChanges = result.changes
+        .filter((c): c is ProcedureChange => c.division === 'PROCEDURE')
+        .map(c => `${c.section} ${c.operation}`)
+      const summary = [...dataChanges, ...procChanges].join(', ')
+
+      process.stdout.write([
+        '',
+        'Suggested AUDIT DIVISION entry:',
+        hr,
+        `   ${today}  ${summary}. Human. "".`,
+        ``,
+        `Add to CHANGE-LOG. and fill in the quoted note.`,
+        '',
+      ].join('\n'))
     }
   })

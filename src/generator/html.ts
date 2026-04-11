@@ -17,6 +17,7 @@ import type {
   DisplayStatement,
   DisplayClause,
   ComponentDef,
+  AuditDivision,
 } from '../parser/rcl.js'
 
 export type ComponentRegistry = Map<string, ComponentDef>
@@ -865,8 +866,22 @@ export function renderStatement(stmt: DisplayStatement, data: DataDivision): str
 // Full HTML document generation
 // ─────────────────────────────────────────────────────────
 
+function generateAuditComment(audit: AuditDivision): string {
+  const col = (s: string, w: number) => s.padEnd(w)
+  const header = [
+    `  created-by:   ${audit.createdBy}`,
+    `  created-date: ${audit.createdDate}`,
+  ]
+  const changes = audit.changeLog.length > 0
+    ? [`  changes:`, ...audit.changeLog.map(e =>
+        `    ${col(e.date, 12)}${col(e.subject, 32)}${col(e.authorKind, 16)}"${e.note}"`
+      )]
+    : []
+  return `<!--\n  RECALL AUDIT\n${[...header, ...changes].join('\n')}\n-->`
+}
+
 export function generate(program: ReclProgram, source: string): string {
-  const { identification: id, environment: env, data, component, procedure } = program
+  const { identification: id, environment: env, data, component, audit, procedure } = program
 
   // Resolve IDENTIFICATION fields that reference WORKING-STORAGE names
   const resolveIdField = (val: string | undefined): string | undefined => {
@@ -972,6 +987,8 @@ document.querySelectorAll('.code-copy-btn').forEach(function(btn) {
 })();
 </script>` : ''
 
+  const auditComment = audit ? generateAuditComment(audit) : ''
+
   return `${sourceComment}
 <!DOCTYPE html>
 <html lang="${lang}">
@@ -988,6 +1005,6 @@ ${css}
 </head>
 <body id="${id.programId.toLowerCase()}">
 ${body}
-${tabsScript}${copyScript}${sidebarScript}</body>
+${tabsScript}${copyScript}${sidebarScript}${auditComment}</body>
 </html>`
 }
