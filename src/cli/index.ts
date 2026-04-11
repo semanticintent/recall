@@ -11,6 +11,7 @@ import { scaffoldCommand } from './commands/scaffold.js'
 import { expandCommand } from './commands/expand.js'
 import { crdCommand } from './commands/crd.js'
 import { manifestCommand } from './commands/manifest.js'
+import { diffCommand } from './commands/diff.js'
 
 const program = new Command()
 
@@ -50,6 +51,11 @@ Workflow:
     recall stats --json                machine-readable aggregate
     recall stats --index <path>        explicit path to index.json
 
+  Semantic diff between two .rcl sources:
+    recall diff v1.rcl v2.rcl          compare two files
+    recall diff HEAD~1 HEAD page.rcl   compare git revisions
+    recall diff --format json v1.rcl v2.rcl  machine-readable output
+
   Look up a diagnostic code:
     recall explain RCL-007             human-readable entry
     recall explain RCL-007 --json      machine-readable JSON
@@ -88,5 +94,6 @@ program.addCommand(scaffoldCommand)
 program.addCommand(expandCommand)
 program.addCommand(crdCommand)
 program.addCommand(manifestCommand)
+program.addCommand(diffCommand)
 
 program.parse()
