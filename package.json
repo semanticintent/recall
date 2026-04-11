@@ -1,6 +1,6 @@
 {
   "name": "@semanticintent/recall-compiler",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "RECALL — what COBOL would have built for the web. A COBOL-inspired publishing language. Declare intent. Compile to HTML. The source is the artifact.",
   "type": "module",
   "main": "./dist/index.js",
