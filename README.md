@@ -1,23 +1,39 @@
 # RECALL
 
-**A COBOL-inspired compiler for the web. Declare intent. Compile to HTML. The source is the artifact.**
+[![npm](https://img.shields.io/npm/v/@semanticintent/recall-compiler)](https://www.npmjs.com/package/@semanticintent/recall-compiler)
+[![tests](https://img.shields.io/badge/tests-124%20passing-brightgreen)](#contributing)
+[![license](https://img.shields.io/badge/license-MIT-blue)](#license)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19463347.svg)](https://doi.org/10.5281/zenodo.19463347)
+
+**A COBOL-inspired compiler for the web. Authorship is a type constraint. The source is the artifact.**
+
+**[→ Try the live playground](https://recall.semanticintent.dev/playground.html)**
 
 ```cobol
 IDENTIFICATION DIVISION.
-   PROGRAM-ID.   MY-SITE.
-   PAGE-TITLE.   "Still Here.".
-   DATE-WRITTEN. 2026-04-10.
+   PROGRAM-ID.    MY-SITE.
+   AUTHOR.        "Michael Shatny".
+   PAGE-TITLE.    "Still Here.".
+   DATE-WRITTEN.  2026-04-11.
 
 DATA DIVISION.
    WORKING-STORAGE SECTION.
-      01 HERO-HEADING  PIC X(60)  VALUE "BUILT FOR THE AI ERA.".
-      01 HERO-BODY     PIC X(200) VALUE "Declare intent. Compile to HTML.".
+      01 HERO-HEADING  PIC X(40)  VALUE "BUILT FOR THE AI ERA.".
+      01 HERO-BODY     PIC X(120) VALUE "Declare intent. Compile to HTML. The source knows who wrote it.".
 
 PROCEDURE DIVISION.
    RENDER-HERO.
-      DISPLAY HEADING-1 HERO-HEADING.
-      DISPLAY PARAGRAPH HERO-BODY.
+      DISPLAY SECTION ID "hero" WITH LAYOUT CENTERED.
+         DISPLAY HEADING-1 HERO-HEADING.
+         DISPLAY PARAGRAPH HERO-BODY.
+      STOP SECTION.
    STOP RUN.
+
+AUDIT DIVISION.
+   CREATED-BY.   Human.
+   CREATED-DATE. 2026-04-11.
+   CHANGE-LOG.
+      2026-04-11  Hero copy updated. Human. "Sharpened for launch."
 ```
 
 ```sh
@@ -25,15 +41,36 @@ recall compile my-site.rcl
 # → my-site.html  (self-contained, zero dependencies)
 ```
 
+View source on the compiled output:
+
+```html
+<!--
+  RECALL AUDIT
+  created-by:   Human
+  created-date: 2026-04-11
+  changes:
+    2026-04-11  Hero copy updated   Human   "Sharpened for launch."
+-->
+```
+
+The artifact knows who wrote it. Not as a commit message. As a compiled fact.
+
 ---
 
 ## What is RECALL?
 
 RECALL is a compiler. You write `.rcl` source files in a division-based, English-like syntax inspired by COBOL. The compiler produces a single self-contained HTML file — inline CSS, no JavaScript framework, no runtime, no build step to run the result.
 
-**The guiding principle: the source is the artifact.**
+**Three things set RECALL apart:**
 
-Every compiled `.html` file embeds its original `.rcl` source in an HTML comment at the top. View source on any RECALL page and you see COBOL divisions. The source and the output travel together, permanently.
+**1. Authorship is a compile-time constraint.**
+`CREATED-BY` in the AUDIT DIVISION accepts exactly three values: `Human`, `AI compositor`, `AI agent`. Anything else aborts compilation. The provenance of every page is a type, not a comment.
+
+**2. The source is embedded in the artifact.**
+Every compiled `.html` file carries its original `.rcl` source in an HTML comment. View source on any RECALL page and the origin is right there. The source and the output travel together, permanently.
+
+**3. AI composition is a first-class clause.**
+`WITH INTENT` lets you declare what a section should do. `recall expand` calls an AI compositor, generates real RECALL source, and the result is validated by the same compiler that validates everything else.
 
 RECALL is not a COBOL runtime, not a React wrapper, not a templating engine. It is a domain-specific language for producing structured, auditable, AI-composable web interfaces.
 
@@ -378,7 +415,13 @@ registerElement('CASE-HERO', (stmt, data) => {
 
 ## Examples
 
-See [`examples/`](examples/) for working `.rcl` files:
+**Live examples** — compiled and deployed, view source to see the `.rcl` origin:
+
+- [recall.semanticintent.dev](https://recall.semanticintent.dev) — RECALL documentation site, built in RECALL
+- [recall.semanticintent.dev/changelog.html](https://recall.semanticintent.dev/changelog.html) — personal project changelog, compiled from `changelog.json` via `LOAD FROM`
+- [recall.semanticintent.dev/playground.html](https://recall.semanticintent.dev/playground.html) — live compiler in the browser
+
+**Source examples** — working `.rcl` files in [`examples/`](examples/):
 
 - [`landing.rcl`](examples/landing.rcl) — RECALL's own landing page
 - [`portfolio.rcl`](examples/portfolio.rcl) — personal portfolio page
