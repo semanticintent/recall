@@ -895,8 +895,12 @@ RECALL Language Specification v0.8.8. Shatny, M. (2026).
 RECALL Cognitive Dimensions Analysis. Shatny, M. (2026).
 `/docs/COGNITIVE-DIMENSIONS-ANALYSIS.md`.
 
+Shatny, M. (2026). *Machine Legibility Dimensions: A Framework for Evaluating
+Notations Where the Primary Reader Is an AI System* (v0.1.0). Zenodo.
+https://doi.org/10.5281/zenodo.19546590
+
 Shatny, M. (2026). *RECALL: A COBOL-Inspired Publishing Language for the Web,
-and the Machine Legibility Dimensions Framework* (v0.8.8). Zenodo.
+and the Machine Legibility Dimensions Framework* (v1.1.0). Zenodo.
 https://doi.org/10.5281/zenodo.19463347
 
 ---
