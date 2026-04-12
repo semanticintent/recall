@@ -279,6 +279,43 @@ from its own embedded AUDIT DIVISION.
 
 ---
 
+## Implementation Philosophy — Keep Simple Things Simple
+
+**The CLI is good when each command has one job that someone actually needs done.**
+Comprehensiveness for its own sake is a design smell.
+
+`recall summarize` follows the same principle as every other RECALL command: one
+clear job, one output, composable with `--format json` when a machine needs to read
+it. The eight-lens framework is a *mental model* for what the artifact knows — not a
+mandate that all eight lenses ship on day one.
+
+### What to ship first
+
+The minimum that closes the loop:
+
+```sh
+recall summarize page.rcl            # full report, human-readable
+recall summarize page.rcl --audit    # authorship + change lenses only
+recall summarize page.rcl --format json
+recall summarize page.html           # extract embedded source, then summarize
+```
+
+That's it. Four invocations, two flags. An AI agent given a provenance task will use
+`--audit --format json`. A human verifying a published page will use the bare command.
+Everything else — `--lens structural`, `--lens output`, individual lens filters — is
+additive and can follow when a real use case surfaces.
+
+### What not to build until needed
+
+- Eight individual `--lens X` flags — the `--audit` shortcut covers the 90% case
+- `--since` / `--until` date filtering on the change lens — `recall audit` already does this
+- Comparison mode (`recall summarize v1.rcl v2.rcl`) — that's `recall diff`'s job
+
+**The test for any new flag:** does someone need this to close a real loop, or does
+it make the command feel more complete? Only the first justifies building it.
+
+---
+
 ## Relationship to Existing Commands
 
 | Command | Primary question |
