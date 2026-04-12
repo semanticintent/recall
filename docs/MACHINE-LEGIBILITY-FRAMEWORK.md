@@ -159,29 +159,43 @@ single tokens in most LLM vocabularies. The model's probability mass for a
 (`.forEach(`, `=>`, `?.`) fragments into multiple tokens and requires the model
 to make several sequential correct decisions to produce one logical operator.
 
-**RECALL rating: Positive**
+**RECALL rating: Neutral**
 
-RECALL's vocabulary is drawn from COBOL, which uses natural English words as
-keywords. `DISPLAY`, `PROCEDURE`, `IDENTIFICATION`, `WORKING-STORAGE`, `VALUE`
-are all well-represented in the training distributions of large language models —
-both because they are English words and because COBOL itself is present in
-training data.
+RECALL's vocabulary splits into two categories that score differently, and
+honesty requires treating them separately.
+
+**Category 1 — Division and clause keywords: strong alignment.**
+`DISPLAY`, `PROCEDURE`, `IDENTIFICATION`, `VALUE`, `WITH`, `STOP`, `SECTION`
+are English words with high LLM representation both from general language and
+from COBOL in training corpora. These keywords generate reliably; the model's
+probability mass is concentrated at semantic decision points (which element?
+which field?) rather than distributed across syntactic fragments.
+
+**Category 2 — Hyphenated identifiers: genuine alignment cost.**
+The SCREAMING-SNAKE-CASE hyphenated identifier convention — `WORKING-STORAGE`,
+`HERO-HEADING`, `PAGE-TITLE`, `PROGRAM-ID`, `CARD-LIST` — splits predictably
+in GPT-family tokenisers. `WORKING-STORAGE` tokenises as `WORK`, `ING`, `-`,
+`STORAGE` in most common vocabularies. Every hyphenated token is a multiplication
+of generation probability across 3–5 subword units rather than one.
+
+This is not a fatal flaw — the SCREAMING convention is a recognisable pattern,
+and the structural positions where identifiers appear (after `DISPLAY`, after
+`01`, after `USING`) constrain the generation space significantly. But it is
+a real cost. The claim that hyphenation is "mitigated" overstates the case.
 
 ```cobol
 DISPLAY HEADING-1 PAGE-TITLE
    WITH STYLE MONO.
 ```
 
-`DISPLAY`, `HEADING-1`, `WITH`, `STYLE`, `MONO` — each of these is a single
-or two-token sequence in GPT-family tokenisers. The probability of correct
-generation is concentrated at semantic decision points (which element? which
-field?) rather than distributed across syntactic fragments.
+`DISPLAY`, `WITH`, `STYLE`, `MONO` — single or two-token. `HEADING-1`,
+`PAGE-TITLE` — split. The session is a mix, and evaluating it as uniformly
+Positive would misrepresent the tokenisation profile.
 
-The hyphenated identifier convention (`PAGE-TITLE`, `HERO-HEADING`,
-`WORKING-STORAGE`) is the one alignment cost: hyphenated tokens sometimes split.
-This is mitigated by the SCREAMING-SNAKE-CASE naming convention, which is
-present in training data as a recognisable pattern even when individual tokens
-split.
+**Net assessment:** Strong on structural keywords; weak on identifier convention.
+Neutral is the honest rating. Empirical tokenisation analysis across a range
+of LLM vocabularies would resolve this precisely — listed as a validation
+requirement in Section 7.
 
 ---
 
@@ -314,10 +328,24 @@ programmatic way to query what is currently valid.
 
 **RECALL rating: Positive**
 
-RECALL implements `recall schema --json`, which returns the live element
-registry from the compiler's internal `BUILT_IN_ELEMENTS` table. The output
-is always current — it cannot drift from the implementation because it *is*
-the implementation.
+**Clarification on what is being measured here:** Schema Availability evaluates
+two separable properties — whether the *language* is designed to be queryable
+(a language design decision), and whether the *tooling* exposes a schema API
+(an implementation decision). A language that is internally consistent and
+has a closed vocabulary satisfies the first property even without a CLI command.
+The `recall schema --json` command satisfies the second. Both matter, but they
+are not the same claim.
+
+RECALL satisfies both. The language has a closed element vocabulary with typed
+constraints — this is a design property. The `recall schema --json` command
+exposes it — this is a tooling property. The rating reflects the combination.
+Another notation could add schema tooling without changing its language design;
+conversely, a language could have a formally queryable design and poor tooling.
+The distinction matters when applying this dimension to other notations.
+
+`recall schema --json` returns the live element registry from the compiler's
+internal `BUILT_IN_ELEMENTS` table. The output is always current — it cannot
+drift from the implementation because it *is* the implementation.
 
 ```json
 {
@@ -666,22 +694,26 @@ supported.
 
 | Dimension | Rating | Summary |
 |---|---|---|
-| Tokenisation Alignment | Positive | COBOL-derived vocabulary; English keywords map well to LLM token distributions |
+| Tokenisation Alignment | **Neutral** | Division/clause keywords align well; hyphenated identifier convention splits in most LLM tokenisers |
 | Ambiguity Surface | Positive | Closed element set, required terminators, explicit types, no implicit references |
 | State Surface | Positive | Near-zero mutable state; PROCEDURE statements are locally evaluable |
-| Schema Availability | Positive | `recall schema --json` and `recall check --format json` expose live compiler state |
+| Schema Availability | Positive | Closed vocabulary by design (language property) + `recall schema --json` (tooling property) |
 | Error Signal Fidelity | Positive | Stable codes, structured JSON output, per-code correction hints |
 | Intent Density | Positive | PIC type semantics, COMMENT clause, WITH INTENT (roadmap) |
 | Round-trip Fidelity | Positive | Source embedded in compiled output by design principle |
 | Constraint Completeness | Positive | Closed vocabulary, strict type system, --strict mode upgrades all warnings to errors |
 | Decomposability | Positive | DATA fields and PROCEDURE sections independently addable |
 
-**Overall profile:** RECALL scores positively on all nine dimensions. This is
-the expected result for a language designed with these properties in mind.
+**Overall profile:** RECALL scores positively on eight of nine dimensions, with
+one Neutral on Tokenisation Alignment. The Neutral reflects a real cost in the
+hyphenated identifier convention that a Positive rating would misrepresent.
 
 The framework's value is not in the RECALL score — it is in the dimensions
 themselves, which provide a vocabulary for evaluating any notation against these
-properties.
+properties. A reference implementation that scores perfectly on every dimension
+would indicate a framework designed backwards. The Neutral on Tokenisation
+Alignment is the honest result, and it points to a concrete open question:
+empirical tokenisation measurement across LLM vocabularies, listed in Section 7.
 
 ---
 
@@ -689,7 +721,7 @@ properties.
 
 | Dimension | HTML | JSX/React | Markdown | RECALL |
 |---|---|---|---|---|
-| Tokenisation Alignment | Neutral | Neutral | Positive | Positive |
+| Tokenisation Alignment | Neutral | Neutral | Positive | **Neutral** |
 | Ambiguity Surface | Weak | Weak | Neutral | Positive |
 | State Surface | Weak | Weak | Positive | Positive |
 | Schema Availability | Neutral | Neutral (PropTypes) | None | Positive |
@@ -746,6 +778,23 @@ tradeoff should be a documented design decision, not an accident.
 | Hidden Dependencies | State Surface (does generation require tracking implicit state?) |
 | Consistency | Tokenisation Alignment (consistent vocabulary maps to consistent token paths) |
 
+**A tension the two frameworks surface together:**
+
+The CD analysis rates RECALL's Progressive Evaluation as **Weak** — the
+all-or-nothing compilation model makes early authoring harder for humans.
+The MLD framework does not have a directly corresponding dimension, but the
+concern is equally real for AI compositors: an AI that cannot compile and
+check a partial program cannot iterate incrementally. The correction loop in
+Dimension 5 (Error Signal Fidelity) assumes the program is complete enough
+to compile.
+
+This tension is productive. It shows that the weak point in RECALL's human
+profile is also a weak point in its AI profile — and both point to the same
+planned mitigation: the `--draft` compiler mode (roadmap, post-1.1). A notation
+improvement that addresses a CD weakness addresses the corresponding MLD concern
+simultaneously. The frameworks agree on the diagnosis even though they arrived
+at it from different directions.
+
 ---
 
 ## 7. Limitations and Future Work
@@ -782,13 +831,26 @@ include:
 
 - **Training distribution alignment** — how well-represented is the notation
   in the pre-training corpora of common LLMs? A notation present in training
-  data requires less inference; one absent from it requires more.
+  data requires less inference; one absent from it requires more. This is not
+  a future dimension for RECALL — it is an open question *right now*. COBOL
+  syntax is present in training corpora; the specific RECALL vocabulary
+  (`DISPLAY HEADING-1`, `STOP SECTION`, `WITH INTENT`, `AUDIT DIVISION`) is
+  entirely novel and not present in any training data at the time of writing.
+  An AI compositor working with RECALL must learn it from the spec and examples
+  provided in context — it cannot fall back on training memory. Whether this
+  is a meaningful cost in practice depends on how effectively the spec and
+  `recall manifest --json` can be loaded as context. This dimension would likely
+  score **Neutral** for RECALL at v1.1.0, with the expectation of improving
+  as RECALL source accumulates in public repositories over time.
 - **Correction convergence** — how quickly does an AI compositor converge on
   a correct program through iterative compilation and correction? Some notations
   may have feedback loops that cycle rather than converge.
 - **Provenance encoding** — does the notation formally support authorship
   metadata, versioning, and intent-of-change annotations? Relevant for
   long-lived collaborative documents where AI and human authorship interleave.
+  RECALL's AUDIT DIVISION would score Positive here — this dimension is listed
+  as future work because it has not been formally defined, not because RECALL
+  lacks the feature.
 
 ---
 
