@@ -1007,3 +1007,86 @@ recall compile page.rcl --draft
 **Why it matters:** Removes the blank-VALUE friction from early authoring. The
 author can scaffold the page structure, see how it renders, and fill in values
 incrementally.
+
+---
+
+### `recall summarize` — Artifact Intelligence
+
+**Goal:** A structured summary of a `.rcl` source (or compiled `.html`) across
+eight lenses. Not a prose description — a machine-readable + human-readable report
+that answers "what is this artifact and who is responsible for it?" in one command.
+
+```sh
+recall summarize page.rcl            # full eight-lens report
+recall summarize page.html           # extract embedded source, then summarize
+recall summarize page.rcl --audit              # authorship + change lenses only
+recall summarize page.rcl --lens data          # single lens
+recall summarize page.rcl --format json        # machine-readable, AI-consumable
+```
+
+**The eight lenses:**
+
+| Lens | What it reports |
+|---|---|
+| **Structural** | Division count, section count, field count, element count |
+| **Intent** | PAGE-TITLE, DESCRIPTION, section IDs, WITH INTENT clause count + text |
+| **Data** | Field names, PIC types, VALUE sizes, LOAD FROM sources, group cardinality |
+| **Authorship** | CREATED-BY kind, CREATED-DATE, CHANGE-LOG entry count, breakdown by author kind (Human / AI compositor / AI agent), last human touch, last AI touch |
+| **Change** | CHANGE-LOG timeline, most recent entry, total changes, first/last dates |
+| **Diagnostic** | Error count, warning count, coverage_pct, truncation count |
+| **Dependency** | COPY FROM paths, LOAD FROM files, LOAD PLUGIN packages |
+| **Output** | Element types used, layout patterns (CENTERED / STACK / GRID / SIDEBAR), estimated output size |
+
+**`--audit` flag:**
+
+Collapses the Authorship and Change lenses into a human-readable provenance brief.
+The focused answer to "who is responsible for this artifact?":
+
+```
+RECALL SUMMARY  page.rcl  --audit
+──────────────────────────────────────────────────────
+Created by:    Human  (2026-04-11)
+Last touched:  Human  (2026-04-11)
+Changes:       1  (1 Human, 0 AI compositor, 0 AI agent)
+Coverage:      94%
+──────────────────────────────────────────────────────
+2026-04-11  Hero copy updated. Human. "Sharpened for launch."
+```
+
+**Why it extends the philosophy:** Every RECALL artifact already carries its own
+source, provenance, and authorship in structured form. `recall summarize` makes
+that embedded intelligence queryable. The artifact answers for itself.
+
+This matters most in three contexts:
+
+1. **AI agents scanning compiled output** — before modifying or re-composing a page,
+   an agent can read a structured summary of who wrote what, when, and with what intent.
+   No need to re-parse the full source.
+
+2. **Pipeline auditing** — `recall summarize --format json` produces the same shape
+   as brief JSON and Pipeline Manifest output. Feeds directly into orchestrator loops
+   and case study indexes without extra transformation.
+
+3. **Long-lived documents** — when a page has been touched by both Human and AI
+   compositor over months, the Authorship and Change lenses produce a timestamped
+   record of the human-AI collaboration history that lives in the artifact, not in git.
+
+**Relationship to `recall diff` and `recall audit`:**
+
+| Command | What it answers |
+|---|---|
+| `recall audit` | Who changed what, in what order |
+| `recall diff` | What structurally changed between two versions |
+| `recall summarize` | What this artifact is and who is responsible for it, right now |
+
+They compose: `recall diff HEAD~1 HEAD page.rcl --suggest-audit` produces a
+CHANGE-LOG entry; `recall summarize` reads the CHANGE-LOG and reports it as
+structured provenance.
+
+**`--audit` is a lens filter, not a separate command.** The full lens set is
+accessible from one command: `recall summarize`. `recall audit` retains its
+existing job — print the raw CHANGE-LOG — and stays focused.
+
+**Note:** The concept behind `recall summarize` is documented in depth in
+`docs/ARTIFACT-INTELLIGENCE.md` — the broader thesis that compiled artifacts
+should be self-describing and machine-queryable without a separate metadata layer.

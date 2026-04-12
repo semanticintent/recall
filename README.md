@@ -438,6 +438,7 @@ Full language reference in [`docs/`](docs/):
 - [`ERROR-REFERENCE.md`](docs/ERROR-REFERENCE.md) — all diagnostic codes
 - [`PIPELINE-OVERVIEW.md`](docs/PIPELINE-OVERVIEW.md) — AI pipeline integration
 - [`POST-1.0-SCOPE.md`](docs/POST-1.0-SCOPE.md) — telemetry, diff, AUDIT DIVISION, LSP
+- [`ARTIFACT-INTELLIGENCE.md`](docs/ARTIFACT-INTELLIGENCE.md) — `recall summarize` and the artifact-as-API thesis
 
 ---
 
