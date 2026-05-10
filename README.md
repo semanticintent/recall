@@ -457,6 +457,12 @@ Open an issue before sending a large PR. Diagnostics and parser changes are the 
 
 ---
 
+## Intent Annotation and Rune Protocol
+
+RECALL's intent annotations — `WITH INTENT` clauses in the PROCEDURE DIVISION and field-level rationale in DATA DIVISION — follow the `?` (intent) rune from [Rune Protocol](https://rune.semanticintent.dev) (DOI: [10.5281/zenodo.20007883](https://doi.org/10.5281/zenodo.20007883)), a four-sigil reactive binding grammar where structured intent is a first-class, machine-readable primitive.
+
+---
+
 ## A note on COBOL
 
 RECALL is an independent language inspired by COBOL's syntax and design philosophy. It shares no code with any COBOL implementation. The COBOL vocabulary — divisions, sections, `DISPLAY`, `WORKING-STORAGE` — is borrowed because it encodes business intent at the language level in a way that no modern web syntax does. That position, not nostalgia, is what RECALL inherits.
